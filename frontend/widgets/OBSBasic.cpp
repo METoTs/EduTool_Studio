@@ -45,6 +45,7 @@
 #include <utility/WhatsNewInfoThread.hpp>
 #endif
 #include <widgets/AudioMixer.hpp>
+#include <components/VolumeControl.hpp>
 #include <widgets/OBSProjector.hpp>
 
 #include <OBSStudioAPI.hpp>
@@ -58,6 +59,9 @@
 
 #include <QActionGroup>
 #include <QComboBox>
+#include <QCheckBox>
+#include <QGroupBox>
+#include <QScrollArea>
 #include <QDialog>
 #include <QSignalBlocker>
 #include <QLabel>
@@ -492,6 +496,9 @@ OBSBasic::OBSBasic(QWidget *parent) : OBSMainWindow(parent), undo_s(ui), ui(new 
 	auto *cameraSettings = new QPushButton(QStringLiteral("카메라 세부 설정"), statusContent);
 	statusLayout->addWidget(cameraSettings);
 	connect(cameraSettings, &QPushButton::clicked, this, &OBSBasic::OpenEduToolCameraSettings);
+	auto *audioSettings = new QPushButton(QStringLiteral("오디오 세부 설정"), statusContent);
+	statusLayout->addWidget(audioSettings);
+	connect(audioSettings, &QPushButton::clicked, this, &OBSBasic::OpenEduToolAudioSettings);
 	statusDock->setWidget(statusContent);
 	addDockWidget(Qt::RightDockWidgetArea, statusDock);
 	statusDock->toggleViewAction()->setText(QStringLiteral("상태 패널"));
@@ -1694,6 +1701,144 @@ void OBSBasic::OnFirstLoad()
 }
 
 OBSBasic::~OBSBasic() {}
+
+void OBSBasic::OpenEduToolAudioSettings()
+{
+	if (auto *existing = findChild<QDialog *>(QStringLiteral("eduToolAudioSettings"))) {
+		existing->show();
+		existing->raise();
+		existing->activateWindow();
+		return;
+	}
+	auto *dialog = new QDialog(this);
+	dialog->setObjectName(QStringLiteral("eduToolAudioSettings"));
+	dialog->setWindowTitle(QStringLiteral("오디오 설정"));
+	dialog->setAttribute(Qt::WA_DeleteOnClose);
+	dialog->resize(720, 600);
+	auto *layout = new QVBoxLayout(dialog);
+	layout->setContentsMargins(24, 24, 24, 24);
+	layout->setSpacing(14);
+	auto *heading = new QLabel(QStringLiteral("오디오 설정"), dialog);
+	heading->setObjectName(QStringLiteral("eduToolAudioHeading"));
+	layout->addWidget(heading);
+	auto *hint = new QLabel(QStringLiteral("변경은 즉시 적용됩니다. PC 소리의 음소거를 켜면 녹화·방송에서 제외됩니다.\n"
+		"볼륨은 출력 음량이며, 모니터링은 직접 듣는 경로입니다. 모니터링 전용 음량은 여기서 별도로 조절하지 않습니다."), dialog);
+	hint->setWordWrap(true);
+	layout->addWidget(hint);
+	auto *scroll = new QScrollArea(dialog);
+	scroll->setWidgetResizable(true);
+	layout->addWidget(scroll, 1);
+	auto *buttons = new QHBoxLayout;
+	layout->addLayout(buttons);
+	auto *devices = new QPushButton(QStringLiteral("입력·PC 소리 장치 구성"), dialog);
+	auto *monitor = new QPushButton(QStringLiteral("모니터링·녹음 트랙"), dialog);
+	auto *close = new QPushButton(QStringLiteral("닫기"), dialog);
+	for (auto *button : {devices, monitor, close})
+		buttons->addWidget(button);
+	connect(devices, &QPushButton::clicked, dialog, [this]() { OpenSettingsPage(4); });
+	connect(monitor, &QPushButton::clicked, this, &OBSBasic::on_actionAdvAudioProperties_triggered);
+	connect(close, &QPushButton::clicked, dialog, &QDialog::close);
+	connect(dialog, &QDialog::finished, this, [this](int) { SaveProject(); });
+	auto signature = std::make_shared<QString>();
+	auto refresh = [this, scroll, signature]() {
+		QString next;
+		for (uint32_t channel = 1; channel <= 6; ++channel) {
+			OBSSourceAutoRelease source = obs_get_output_source(channel);
+			next += QStringLiteral("%1:%2;").arg(channel).arg(source ? obs_source_get_uuid(source) : "");
+		}
+		if (*signature == next)
+			return;
+		*signature = next;
+		auto *content = new QWidget;
+		auto *rows = new QVBoxLayout(content);
+		int count = 0;
+		for (uint32_t channel = 1; channel <= 6; ++channel) {
+			OBSSourceAutoRelease source = obs_get_output_source(channel);
+			if (!source)
+				continue;
+			++count;
+			auto *group = new QGroupBox(channel <= 2 ? QStringLiteral("PC 소리 %1").arg(channel)
+				: QStringLiteral("마이크 / 입력 %1").arg(channel - 2), content);
+			auto *row = new QVBoxLayout(group);
+			row->addWidget(new VolumeControl(source, group));
+			auto *actions = new QHBoxLayout;
+			row->addLayout(actions);
+			auto *propertiesButton = new QPushButton(QStringLiteral("장치 선택"), group);
+			auto *filtersButton = new QPushButton(QStringLiteral("오디오 필터"), group);
+			actions->addWidget(propertiesButton);
+			actions->addWidget(filtersButton);
+			auto *automatic = new QCheckBox(QStringLiteral("자동 음량 조절 — 큰 소리 줄이기 (압축)"), group);
+			row->addWidget(automatic);
+			const QString uuid = QString::fromUtf8(obs_source_get_uuid(source));
+			auto resolve = [uuid]() -> OBSSource {
+				OBSSourceAutoRelease current = obs_get_source_by_uuid(uuid.toUtf8().constData());
+				return current && !obs_source_removed(current) ? OBSSource(current) : OBSSource();
+			};
+			auto managedFilter = [](obs_source_t *current) -> OBSSource {
+				OBSSource result;
+				obs_source_enum_filters(current, [](obs_source_t *, obs_source_t *filter, void *data) {
+					OBSDataAutoRelease settings = obs_source_get_private_settings(filter);
+					if (strcmp(obs_source_get_unversioned_id(filter), "compressor_filter") == 0 &&
+					    obs_data_get_bool(settings, "edutool_auto_volume"))
+						*static_cast<OBSSource *>(data) = filter;
+				}, &result);
+				return result;
+			};
+			connect(propertiesButton, &QPushButton::clicked, group, [this, resolve]() {
+				if (OBSSource current = resolve()) CreatePropertiesWindow(current);
+			});
+			connect(filtersButton, &QPushButton::clicked, group, [this, resolve]() {
+				if (OBSSource current = resolve()) CreateFiltersWindow(current);
+			});
+			connect(automatic, &QCheckBox::toggled, group, [this, resolve, managedFilter, automatic](bool enabled) {
+				OBSSource current = resolve();
+				if (!current) return;
+				OBSSource filter = managedFilter(current);
+				if (enabled && !filter) {
+					OBSDataAutoRelease settings = obs_data_create();
+					obs_data_set_double(settings, "ratio", 4.0);
+					obs_data_set_double(settings, "threshold", -18.0);
+					obs_data_set_int(settings, "attack_time", 6);
+					obs_data_set_int(settings, "release_time", 60);
+					obs_data_set_double(settings, "output_gain", 0.0);
+					OBSSourceAutoRelease created = obs_source_create("compressor_filter", "EduTool 자동 음량", settings, nullptr);
+					if (!created) {
+						QSignalBlocker blocker(automatic);
+						automatic->setChecked(false);
+						ShowEduToolError(QStringLiteral("자동 음량 필터를 만들 수 없습니다. 오디오 필터 모듈을 확인하세요."), 4);
+						return;
+					}
+					OBSDataAutoRelease marker = obs_source_get_private_settings(created);
+					obs_data_set_bool(marker, "edutool_auto_volume", true);
+					obs_source_filter_add(current, created);
+					filter = created;
+				}
+				if (filter) obs_source_set_enabled(filter, enabled);
+				SaveProject();
+			});
+			auto sync = [resolve, managedFilter, automatic]() {
+				OBSSource current = resolve();
+				OBSSource filter = current ? managedFilter(current) : OBSSource();
+				QSignalBlocker blocker(automatic);
+				automatic->setEnabled(bool(current));
+				automatic->setChecked(filter && obs_source_enabled(filter));
+			};
+			auto *timer = new QTimer(group);
+			connect(timer, &QTimer::timeout, group, sync);
+			timer->start(1000);
+			sync();
+			rows->addWidget(group);
+		}
+		if (!count) rows->addWidget(new QLabel(QStringLiteral("입력이 없습니다. ‘입력·PC 소리 장치 구성’에서 장치를 선택하세요."), content));
+		rows->addStretch();
+		scroll->setWidget(content);
+	};
+	auto *timer = new QTimer(dialog);
+	connect(timer, &QTimer::timeout, dialog, refresh);
+	timer->start(1000);
+	refresh();
+	dialog->show();
+}
 
 void OBSBasic::OpenEduToolCameraSettings()
 {

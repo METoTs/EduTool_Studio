@@ -2906,11 +2906,11 @@ QLabel#eduToolFeatureSummary {
     font-size: 16px;
 }
 
-QDialog#eduToolSourceManager, QDialog#eduToolCameraSettings {
+QDialog#eduToolSourceManager, QDialog#eduToolCameraSettings, QDialog#eduToolAudioSettings {
     background: #09203a;
 }
 
-QLabel#eduToolSourceHeading, QLabel#eduToolCameraHeading {
+QLabel#eduToolSourceHeading, QLabel#eduToolCameraHeading, QLabel#eduToolAudioHeading {
     color: #e7f1ff;
     font-size: 24px;
     font-weight: 700;
@@ -2933,7 +2933,8 @@ QListWidget#eduToolSourceList::item:selected {
     color: white;
 }
 
-QDialog#eduToolSourceManager QPushButton, QDialog#eduToolCameraSettings QPushButton {
+QDialog#eduToolSourceManager QPushButton, QDialog#eduToolCameraSettings QPushButton,
+QDialog#eduToolAudioSettings QPushButton {
     padding: 10px 14px;
     border-radius: 6px;
 }

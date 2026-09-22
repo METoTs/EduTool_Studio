@@ -628,6 +628,7 @@ private slots:
 	void ClearEduToolError();
 	void OpenEduToolSourceManager();
 	void OpenEduToolCameraSettings();
+	void OpenEduToolAudioSettings();
 	void on_actionShowMacPermissions_triggered();
 	void on_actionShowLogs_triggered();
 	void on_actionUploadCurrentLog_triggered();
