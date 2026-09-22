@@ -54,6 +54,19 @@ void OBSBasic::StartStreaming()
 	if (disableOutputsRef) {
 		return;
 	}
+	obs_service_t *configuredService = GetService();
+	if (!configuredService) {
+		ShowEduToolError(QStringLiteral("방송 연결을 먼저 설정하세요."), 2);
+		return;
+	}
+	const char *serviceId = obs_service_get_id(configuredService);
+	if (!auth && serviceId && (strcmp(serviceId, "rtmp_common") == 0 || strcmp(serviceId, "rtmp_custom") == 0)) {
+		OBSDataAutoRelease connection = obs_service_get_settings(configuredService);
+		if (!*obs_data_get_string(connection, "key")) {
+			ShowEduToolError(QStringLiteral("방송 계정을 연결하거나 스트림 키를 입력하세요."), 2);
+			return;
+		}
+	}
 
 	if (auth && auth->broadcastFlow()) {
 		if (!broadcastActive && !broadcastReady) {

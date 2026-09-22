@@ -10,6 +10,8 @@ else()
 endif()
 
 find_package(FFmpeg REQUIRED COMPONENTS avcodec avutil avformat)
+find_program(EDUTOOL_FFMPEG NAMES ffmpeg HINTS "${FFmpeg_avcodec_INCLUDE_DIR}/../bin" REQUIRED)
+find_program(EDUTOOL_FFPROBE NAMES ffprobe HINTS "${FFmpeg_avcodec_INCLUDE_DIR}/../bin" REQUIRED)
 find_package(CURL REQUIRED)
 
 if(NOT TARGET OBS::json11)
@@ -30,6 +32,18 @@ endif()
 
 add_executable(obs-studio)
 add_executable(OBS::studio ALIAS obs-studio)
+
+if(OS_WINDOWS)
+  get_filename_component(edutool_media_bin "${EDUTOOL_FFMPEG}" DIRECTORY)
+  file(GLOB edutool_media_runtime "${edutool_media_bin}/av*.dll" "${edutool_media_bin}/sw*.dll")
+  add_custom_command(TARGET obs-studio POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${OBS_OUTPUT_DIR}/$<CONFIG>/${OBS_EXECUTABLE_DESTINATION}"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${EDUTOOL_FFMPEG}" "${EDUTOOL_FFPROBE}" ${edutool_media_runtime}
+      "${OBS_OUTPUT_DIR}/$<CONFIG>/${OBS_EXECUTABLE_DESTINATION}"
+    COMMAND_EXPAND_LISTS VERBATIM)
+  install(PROGRAMS "${EDUTOOL_FFMPEG}" "${EDUTOOL_FFPROBE}" DESTINATION "${OBS_EXECUTABLE_DESTINATION}" COMPONENT Runtime)
+  install(FILES ${edutool_media_runtime} DESTINATION "${OBS_EXECUTABLE_DESTINATION}" COMPONENT Runtime)
+endif()
 
 target_link_libraries(
   obs-studio

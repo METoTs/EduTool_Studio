@@ -12,6 +12,10 @@ target_sources(
   PRIVATE
     widgets/AudioMixer.cpp
     widgets/AudioMixer.hpp
+    widgets/EduToolEditor.cpp
+    widgets/EduToolEditor.hpp
+    widgets/EduToolPortal.cpp
+    widgets/EduToolPortal.hpp
     widgets/ColorSelect.cpp
     widgets/ColorSelect.hpp
     widgets/OBSBasic.cpp

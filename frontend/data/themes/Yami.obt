@@ -2938,3 +2938,38 @@ QDialog#eduToolAudioSettings QPushButton {
     padding: 10px 14px;
     border-radius: 6px;
 }
+
+QWidget#eduToolEditor, QWidget#eduToolPortal {
+    background: #09203a;
+}
+
+QWidget#eduToolEditor QPushButton, QWidget#eduToolPortal QPushButton {
+    padding: 8px 12px;
+    border: 1px solid #205887;
+    border-radius: 6px;
+    background: #103754;
+    color: #e7f1ff;
+}
+
+QWidget#eduToolEditor QPushButton:hover, QWidget#eduToolPortal QPushButton:hover {
+    background: #1266cf;
+}
+
+QWidget#eduToolEditor QPushButton:disabled, QWidget#eduToolPortal QPushButton:disabled {
+    background: #142837;
+    color: #6d7e8c;
+}
+
+QWidget#eduToolEditor QListWidget {
+    border: 1px solid #205887;
+    border-radius: 6px;
+    background: #06192d;
+}
+
+QWidget#eduToolEditor QListWidget::item {
+    padding: 12px;
+}
+
+QPushButton#recordButton {
+    font-weight: 700;
+}

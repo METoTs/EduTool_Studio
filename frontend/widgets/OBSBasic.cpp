@@ -45,6 +45,8 @@
 #include <utility/WhatsNewInfoThread.hpp>
 #endif
 #include <widgets/AudioMixer.hpp>
+#include <widgets/EduToolEditor.hpp>
+#include <widgets/EduToolPortal.hpp>
 #include <components/VolumeControl.hpp>
 #include <widgets/OBSProjector.hpp>
 
@@ -419,28 +421,14 @@ OBSBasic::OBSBasic(QWidget *parent) : OBSMainWindow(parent), undo_s(ui), ui(new 
 	auto *featurePages = new QStackedWidget(this);
 	featurePages->setObjectName(QStringLiteral("eduToolFeaturePages"));
 	featurePages->addWidget(takeCentralWidget());
-	auto addFeaturePage = [featurePages](const QString &title, const QString &description) {
-		auto *page = new QWidget(featurePages);
-		page->setObjectName(QStringLiteral("eduToolFeaturePage"));
-		auto *layout = new QVBoxLayout(page);
-		layout->setContentsMargins(48, 48, 48, 48);
-		layout->addStretch();
-		auto *heading = new QLabel(title, page);
-		heading->setObjectName(QStringLiteral("eduToolFeatureHeading"));
-		heading->setAlignment(Qt::AlignCenter);
-		layout->addWidget(heading);
-		auto *summary = new QLabel(description, page);
-		summary->setObjectName(QStringLiteral("eduToolFeatureSummary"));
-		summary->setAlignment(Qt::AlignCenter);
-		summary->setWordWrap(true);
-		layout->addWidget(summary);
-		layout->addStretch();
-		return featurePages->addWidget(page);
-	};
-	const int editPage = addFeaturePage(QStringLiteral("영상 편집"),
-					    QStringLiteral("영상 불러오기와 타임라인 편집 기능을 준비하고 있습니다."));
-	const int uploadPage = addFeaturePage(QStringLiteral("홈페이지 업로드"),
-					      QStringLiteral("계정과 홈페이지를 연결하면 영상을 업로드할 수 있습니다."));
+	auto *editor = new EduToolEditor(featurePages);
+	auto *editorScroll = new QScrollArea(featurePages);
+	editorScroll->setWidgetResizable(true);
+	editorScroll->setWidget(editor);
+	const int editPage = featurePages->addWidget(editorScroll);
+	auto *portal = new EduToolPortal(featurePages);
+	const int uploadPage = featurePages->addWidget(portal);
+	connect(editor, &EduToolEditor::exportReady, portal, &EduToolPortal::offerFile);
 	setCentralWidget(featurePages);
 
 	auto *featureBar = new QToolBar(QStringLiteral("EduTool 기능"), this);
@@ -496,6 +484,22 @@ OBSBasic::OBSBasic(QWidget *parent) : OBSMainWindow(parent), undo_s(ui), ui(new 
 		label->setWordWrap(true);
 		statusLayout->addWidget(label);
 	}
+	auto *liveConnection = new QLabel(statusContent);
+	liveConnection->setWordWrap(true);
+	liveConnection->setTextFormat(Qt::PlainText);
+	statusLayout->addWidget(liveConnection);
+	auto *connectionTimer = new QTimer(statusContent);
+	connect(connectionTimer, &QTimer::timeout, statusContent, [this, liveConnection]() {
+		obs_service_t *current = GetService();
+		if (!current) { liveConnection->setText(QStringLiteral("방송 연결 설정 필요")); return; }
+		OBSDataAutoRelease settings = obs_service_get_settings(current);
+		QString provider = QString::fromUtf8(obs_data_get_string(settings, "service"));
+		if (provider.isEmpty()) provider = QStringLiteral("사용자 지정 방송");
+		const QString state = auth ? QStringLiteral("계정 연결됨") : *obs_data_get_string(settings, "key")
+			? QStringLiteral("스트림 키 설정됨") : QStringLiteral("연결 설정 필요");
+		liveConnection->setText(QStringLiteral("%1\n%2").arg(provider, state));
+	});
+	connectionTimer->start(1000);
 	statusLayout->addStretch();
 	auto *cameraSettings = new QPushButton(QStringLiteral("카메라 세부 설정"), statusContent);
 	statusLayout->addWidget(cameraSettings);
@@ -677,6 +681,9 @@ OBSBasic::OBSBasic(QWidget *parent) : OBSMainWindow(parent), undo_s(ui), ui(new 
 		recordSettingsAction->setVisible(recording);
 		liveSettingsAction->setVisible(live);
 		previewBar->setVisible(recording || live);
+		const QString mode = recording ? QStringLiteral("record") : live ? QStringLiteral("live")
+			: page == 1 ? QStringLiteral("edit") : QStringLiteral("upload");
+		config_set_string(App()->GetUserConfig(), "EduTool", "LastFeature", mode.toUtf8().constData());
 	};
 	connect(recordPageAction, &QAction::triggered, this, [switchFeature]() { switchFeature(0, true, false); });
 	connect(livePageAction, &QAction::triggered, this, [switchFeature]() { switchFeature(0, false, true); });
@@ -684,14 +691,34 @@ OBSBasic::OBSBasic(QWidget *parent) : OBSMainWindow(parent), undo_s(ui), ui(new 
 		[=]() { switchFeature(editPage, false, false); });
 	connect(uploadPageAction, &QAction::triggered, this,
 		[=]() { switchFeature(uploadPage, false, false); });
+	connect(editor, &EduToolEditor::uploadRequested, this, [portal, uploadPageAction](const QString &path) {
+		portal->offerFile(path);
+		uploadPageAction->trigger();
+	});
+	auto *accountAction = featureBar->addAction(QStringLiteral("로그인"));
+	connect(accountAction, &QAction::triggered, uploadPageAction, &QAction::trigger);
+	connect(portal, &EduToolPortal::accountChanged, accountAction, &QAction::setText);
+	QTimer::singleShot(0, this, [recordPageAction, livePageAction, editPageAction, uploadPageAction]() {
+		const QString mode = QString::fromUtf8(config_get_string(App()->GetUserConfig(), "EduTool", "LastFeature"));
+		(mode == "live" ? livePageAction : mode == "edit" ? editPageAction : mode == "upload" ? uploadPageAction : recordPageAction)->trigger();
+	});
 
 	auto updateActivityStatus = [this, activityStatus, panelActivityStatus]() {
 		const bool recording = RecordingActive();
 		const bool streaming = StreamingActive();
-		activityStatus->setText(streaming && recording ? QStringLiteral("● LIVE  ● REC")
-					   : streaming        ? QStringLiteral("● LIVE")
-					   : recording        ? QStringLiteral("● REC")
-							      : QStringLiteral("녹화·방송 대기"));
+		auto elapsed = [](obs_output_t *output) {
+			obs_video_info info = {};
+			if (!output || !obs_get_video_info(&info) || !info.fps_num) return QStringLiteral("00:00:00");
+			const uint64_t seconds = uint64_t(obs_output_get_total_frames(output)) * info.fps_den / info.fps_num;
+			return QStringLiteral("%1:%2:%3").arg(seconds / 3600, 2, 10, QChar('0'))
+				.arg(seconds / 60 % 60, 2, 10, QChar('0')).arg(seconds % 60, 2, 10, QChar('0'));
+		};
+		QStringList states;
+		if (streaming) states << QStringLiteral("● LIVE %1%2").arg(elapsed(outputHandler->streamOutput),
+			obs_output_reconnecting(outputHandler->streamOutput) ? QStringLiteral(" · 재연결 중") : QString());
+		if (recording) states << QStringLiteral("● REC %1").arg(elapsed(outputHandler->fileOutput));
+		if (eduToolRecordDelayTimer) states << QStringLiteral("녹화 시작 대기");
+		activityStatus->setText(states.isEmpty() ? QStringLiteral("녹화·방송 대기") : states.join(QStringLiteral("  ")));
 		panelActivityStatus->setText(activityStatus->text());
 	};
 	connect(this, &OBSBasic::RecordingStarted, this, updateActivityStatus);
@@ -1779,7 +1806,7 @@ void OBSBasic::OpenEduToolAudioSettings()
 	heading->setObjectName(QStringLiteral("eduToolAudioHeading"));
 	layout->addWidget(heading);
 	auto *hint = new QLabel(QStringLiteral("변경은 즉시 적용됩니다. PC 소리의 음소거를 켜면 녹화·방송에서 제외됩니다.\n"
-		"볼륨은 출력 음량이며, 모니터링은 직접 듣는 경로입니다. 모니터링 전용 음량은 여기서 별도로 조절하지 않습니다."), dialog);
+		"기본 볼륨은 녹음·방송 출력, 모니터링 음량은 직접 듣는 소리입니다. 입력 게인은 필터를 통해 두 경로에 적용됩니다."), dialog);
 	hint->setWordWrap(true);
 	layout->addWidget(hint);
 	auto *scroll = new QScrollArea(dialog);
@@ -1831,6 +1858,49 @@ void OBSBasic::OpenEduToolAudioSettings()
 				OBSSourceAutoRelease current = obs_get_source_by_uuid(uuid.toUtf8().constData());
 				return current && !obs_source_removed(current) ? OBSSource(current) : OBSSource();
 			};
+			auto *monitorVolume = new QSpinBox(group);
+			monitorVolume->setRange(-1, 400);
+			monitorVolume->setSuffix(QStringLiteral(" % · 모니터링 음량"));
+			monitorVolume->setSpecialValueText(QStringLiteral("모니터링: 출력 볼륨 따라가기"));
+			monitorVolume->setAccessibleName(QStringLiteral("모니터링 전용 음량"));
+			row->addWidget(monitorVolume);
+			connect(monitorVolume, &QSpinBox::valueChanged, group, [this, resolve](int value) {
+				if (OBSSource current = resolve()) { obs_source_set_monitoring_volume(current, value < 0 ? -1.0f : value / 100.0f); SaveProject(); }
+			});
+			auto *inputGain = new QSpinBox(group);
+			inputGain->setRange(-30, 30); inputGain->setSuffix(QStringLiteral(" dB · 입력 게인"));
+			inputGain->setAccessibleName(QStringLiteral("입력 게인")); row->addWidget(inputGain);
+			auto findGain = [](obs_source_t *current) -> OBSSource {
+				OBSSource result;
+				obs_source_enum_filters(current, [](obs_source_t *, obs_source_t *filter, void *data) {
+					OBSDataAutoRelease metadata = obs_source_get_private_settings(filter);
+					if (strcmp(obs_source_get_unversioned_id(filter), "gain_filter") == 0 && obs_data_get_bool(metadata, "edutool_input_gain"))
+						*static_cast<OBSSource *>(data) = filter;
+				}, &result);
+				return result;
+			};
+			connect(inputGain, &QSpinBox::valueChanged, group, [this, resolve, findGain](int value) {
+				OBSSource current = resolve(); if (!current) return;
+				OBSSource gain = findGain(current);
+				OBSDataAutoRelease settings = obs_data_create(); obs_data_set_double(settings, "db", value);
+				if (!gain) {
+					OBSSourceAutoRelease created = obs_source_create("gain_filter", "EduTool 입력 게인", settings, nullptr);
+					if (!created) { ShowEduToolError(QStringLiteral("입력 게인 필터를 생성하지 못했습니다."), 4); return; }
+					OBSDataAutoRelease metadata = obs_source_get_private_settings(created); obs_data_set_bool(metadata, "edutool_input_gain", true);
+					obs_source_filter_add(current, created); obs_source_filter_set_order(current, created, OBS_ORDER_MOVE_TOP); gain = created;
+				} else obs_source_update(gain, settings);
+				obs_source_set_enabled(gain, true); SaveProject();
+			});
+			auto *volumeSync = new QTimer(group);
+			auto syncVolumes = [resolve, findGain, inputGain, monitorVolume]() {
+				OBSSource current = resolve(); if (!current) return;
+				QSignalBlocker a(inputGain), b(monitorVolume);
+				const float volume = obs_source_get_monitoring_volume(current);
+				monitorVolume->setValue(volume < 0 ? -1 : int(volume * 100.0f + 0.5f));
+				OBSSource gain = findGain(current); OBSDataAutoRelease settings = gain ? obs_source_get_settings(gain) : nullptr;
+				inputGain->setValue(settings && obs_source_enabled(gain) ? int(obs_data_get_double(settings, "db")) : 0);
+			};
+			connect(volumeSync, &QTimer::timeout, group, syncVolumes); volumeSync->start(1000); syncVolumes();
 			auto managedFilter = [](obs_source_t *current) -> OBSSource {
 				OBSSource result;
 				obs_source_enum_filters(current, [](obs_source_t *, obs_source_t *filter, void *data) {
@@ -2346,6 +2416,14 @@ void OBSBasic::close()
 
 void OBSBasic::closeEvent(QCloseEvent *event)
 {
+	if (auto *editor = findChild<EduToolEditor *>(); editor && !editor->confirmClose()) {
+		event->ignore();
+		return;
+	}
+	if (auto *portal = findChild<EduToolPortal *>(); portal && !portal->confirmClose()) {
+		event->ignore();
+		return;
+	}
 	if (isClosePromptOpen() || isClosing()) {
 		return;
 	}
@@ -2393,7 +2471,10 @@ void OBSBasic::closeEvent(QCloseEvent *event)
 	if (auto *featurePages = findChild<QStackedWidget *>(QStringLiteral("eduToolFeaturePages"));
 	    featurePages && featurePages->currentIndex() != 0) {
 		if (auto *recordPageAction = findChild<QAction *>(QStringLiteral("eduToolRecordPageAction"))) {
+			const char *lastMode = config_get_string(App()->GetUserConfig(), "EduTool", "LastFeature");
+			const std::string last = lastMode ? lastMode : "record";
 			recordPageAction->trigger();
+			config_set_string(App()->GetUserConfig(), "EduTool", "LastFeature", last.c_str());
 		}
 	}
 

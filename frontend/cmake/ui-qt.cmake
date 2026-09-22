@@ -1,4 +1,4 @@
-find_package(Qt6 REQUIRED Widgets Network Svg Xml)
+find_package(Qt6 REQUIRED Widgets Network Svg Xml Multimedia MultimediaWidgets Concurrent)
 
 if(OS_LINUX OR OS_FREEBSD OR OS_OPENBSD)
   find_package(Qt6 REQUIRED Gui DBus)
@@ -10,8 +10,19 @@ endif()
 
 target_link_libraries(
   obs-studio
-  PRIVATE Qt::Widgets Qt::Svg Qt::Xml Qt::Network OBS::qt-wrappers
+  PRIVATE Qt::Widgets Qt::Svg Qt::Xml Qt::Network Qt::Multimedia Qt::MultimediaWidgets Qt::Concurrent OBS::qt-wrappers
 )
+
+if(OS_WINDOWS)
+  add_custom_command(TARGET obs-studio POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${OBS_OUTPUT_DIR}/$<CONFIG>/${OBS_EXECUTABLE_DESTINATION}/multimedia"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different "$<TARGET_FILE:Qt6::Multimedia>" "$<TARGET_FILE:Qt6::MultimediaWidgets>" "$<TARGET_FILE:Qt6::Concurrent>"
+      "${OBS_OUTPUT_DIR}/$<CONFIG>/${OBS_EXECUTABLE_DESTINATION}"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different "$<TARGET_FILE:Qt6::QWindowsMediaPlugin>"
+      "${OBS_OUTPUT_DIR}/$<CONFIG>/${OBS_EXECUTABLE_DESTINATION}/multimedia"
+    VERBATIM)
+  install(FILES "$<TARGET_FILE:Qt6::QWindowsMediaPlugin>" DESTINATION "${OBS_EXECUTABLE_DESTINATION}/multimedia" COMPONENT Runtime)
+endif()
 
 set_target_properties(
   obs-studio

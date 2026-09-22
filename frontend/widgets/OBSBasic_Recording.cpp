@@ -18,6 +18,7 @@
 ******************************************************************************/
 
 #include "OBSBasic.hpp"
+#include "EduToolPortal.hpp"
 
 #include <components/UIValidation.hpp>
 #include <dialogs/OBSRemux.hpp>
@@ -329,6 +330,8 @@ void OBSBasic::RecordingStop(int code, QString last_error)
 			if (file.isFile() && file.size() > 0) {
 				QString str = QTStr("Basic.StatusBar.RecordingSavedTo");
 				ShowStatusBarMessage(str.arg(file.absoluteFilePath()));
+				if (auto *portal = findChild<EduToolPortal *>())
+					portal->recordingFinished(file.absoluteFilePath());
 			} else if (!IsFFmpegOutputToURL()) {
 				ShowEduToolError(QStringLiteral("녹화 파일을 확인할 수 없습니다. 저장 위치와 녹화 로그를 확인하세요."), 3);
 			}
