@@ -1,6 +1,9 @@
 # Exclude everything
 /*
 
+# Local evidence captured after each TC bundle
+/tc-screenshots/
+
 # Except for default project files
 !/.github
 !/build-aux

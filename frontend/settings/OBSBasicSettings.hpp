@@ -452,7 +452,7 @@ protected:
 	void reject() override;
 
 public:
-	OBSBasicSettings(QWidget *parent);
+	OBSBasicSettings(QWidget *parent, int initialPage = 0);
 	~OBSBasicSettings();
 
 	inline const QIcon &GetHotkeyConflictIcon() const { return hotkeyConflictIcon; }

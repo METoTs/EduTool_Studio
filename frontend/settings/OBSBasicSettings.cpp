@@ -336,7 +336,7 @@ void RestrictResetBitrates(initializer_list<QComboBox *> boxes, int maxbitrate);
 #define ADV_RESTART     &OBSBasicSettings::AdvancedChangedRestart
 /* clang-format on */
 
-OBSBasicSettings::OBSBasicSettings(QWidget *parent)
+OBSBasicSettings::OBSBasicSettings(QWidget *parent, int initialPage)
 	: QDialog(parent),
 	  main(qobject_cast<OBSBasic *>(parent)),
 	  ui(new Ui::OBSBasicSettings)
@@ -938,6 +938,9 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 	ui->audioMsg->setVisible(false);
 	ui->advancedMsg->setVisible(false);
 	ui->advancedMsg2->setVisible(false);
+	if (initialPage >= 0 && initialPage < Pages::NUM_PAGES) {
+		ui->listWidget->setCurrentRow(initialPage);
+	}
 }
 
 OBSBasicSettings::~OBSBasicSettings()

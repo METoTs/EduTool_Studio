@@ -120,11 +120,13 @@ void OBSBasic::StartRecording()
 	}
 
 	if (!OutputPathValid()) {
+		ShowEduToolError(QStringLiteral("녹화 오류: %1").arg(QTStr("Output.BadPath.Text")), 3);
 		OutputPathInvalidMessage();
 		return;
 	}
 
 	if (!IsFFmpegOutputToURL() && LowDiskSpace()) {
+		ShowEduToolError(QStringLiteral("녹화 오류: %1").arg(QTStr("Output.RecordNoSpace.Msg")), 3);
 		DiskSpaceMessage();
 		return;
 	}
@@ -161,6 +163,7 @@ void OBSBasic::StopRecording()
 
 void OBSBasic::RecordingStart()
 {
+	ClearEduToolError();
 	ui->statusbar->RecordingStarted(outputHandler->fileOutput);
 	emit RecordingStarted(isRecordingPausable);
 
@@ -182,6 +185,15 @@ void OBSBasic::RecordingStart()
 
 void OBSBasic::RecordingStop(int code, QString last_error)
 {
+	if (code != OBS_OUTPUT_SUCCESS) {
+		QString reason = last_error;
+		if (reason.isEmpty()) {
+			reason = code == OBS_OUTPUT_NO_SPACE ? QTStr("Output.RecordNoSpace.Msg")
+			       : code == OBS_OUTPUT_UNSUPPORTED ? QTStr("Output.RecordFail.Unsupported")
+							: QTStr("Output.RecordError.Msg");
+		}
+		ShowEduToolError(QStringLiteral("녹화 오류: %1").arg(reason), 3);
+	}
 	ui->statusbar->RecordingStopped();
 	emit RecordingStopped();
 

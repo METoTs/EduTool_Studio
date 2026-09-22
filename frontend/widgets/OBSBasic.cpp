@@ -57,7 +57,13 @@
 #include <qt-wrappers.hpp>
 
 #include <QActionGroup>
+#include <QLabel>
+#include <QPushButton>
+#include <QStackedWidget>
 #include <QThread>
+#include <QTimer>
+#include <QToolBar>
+#include <QVBoxLayout>
 #include <QWidgetAction>
 
 #include <mutex>
@@ -75,6 +81,37 @@
 #include "moc_OBSBasic.cpp"
 
 using namespace std;
+
+static QString EduToolDeviceState(obs_source_t *source, const char *deviceProperty)
+{
+	if (!source) {
+		return QStringLiteral("미설정");
+	}
+	OBSDataAutoRelease settings = obs_source_get_settings(source);
+	const char *selected = obs_data_get_string(settings, deviceProperty);
+	if (!selected || !*selected) {
+		return QStringLiteral("장치 미선택");
+	}
+	obs_properties_t *properties = obs_source_properties(source);
+	if (!properties) {
+		return QStringLiteral("확인 불가");
+	}
+	obs_property_t *devices = obs_properties_get(properties, deviceProperty);
+	bool found = false;
+	if (devices) {
+		for (size_t i = 0; i < obs_property_list_item_count(devices); ++i) {
+			const char *candidate = obs_property_list_item_string(devices, i);
+			if (candidate && strcmp(selected, candidate) == 0) {
+				found = true;
+				break;
+			}
+		}
+	}
+	const bool hasDeviceList = devices != nullptr;
+	obs_properties_destroy(properties);
+	return !hasDeviceList ? QStringLiteral("확인 불가")
+			: found ? QStringLiteral("연결됨") : QStringLiteral("연결 끊김");
+}
 
 extern bool portable_mode;
 extern bool disable_3p_plugins;
@@ -362,6 +399,232 @@ OBSBasic::OBSBasic(QWidget *parent) : OBSMainWindow(parent), undo_s(ui), ui(new 
 	int sideDockWidth = std::min(width() * 30 / 100, 320);
 	resizeDocks({ui->scenesDock, ui->sourcesDock}, {sideDockWidth, sideDockWidth}, Qt::Horizontal);
 	addDockWidget(Qt::BottomDockWidgetArea, controlsDock);
+
+	/* Keep the OBS preview alive while the EduTool feature pages change. */
+	auto *featurePages = new QStackedWidget(this);
+	featurePages->setObjectName(QStringLiteral("eduToolFeaturePages"));
+	featurePages->addWidget(takeCentralWidget());
+	auto addFeaturePage = [featurePages](const QString &title, const QString &description) {
+		auto *page = new QWidget(featurePages);
+		page->setObjectName(QStringLiteral("eduToolFeaturePage"));
+		auto *layout = new QVBoxLayout(page);
+		layout->setContentsMargins(48, 48, 48, 48);
+		layout->addStretch();
+		auto *heading = new QLabel(title, page);
+		heading->setObjectName(QStringLiteral("eduToolFeatureHeading"));
+		heading->setAlignment(Qt::AlignCenter);
+		layout->addWidget(heading);
+		auto *summary = new QLabel(description, page);
+		summary->setObjectName(QStringLiteral("eduToolFeatureSummary"));
+		summary->setAlignment(Qt::AlignCenter);
+		summary->setWordWrap(true);
+		layout->addWidget(summary);
+		layout->addStretch();
+		return featurePages->addWidget(page);
+	};
+	const int editPage = addFeaturePage(QStringLiteral("영상 편집"),
+					    QStringLiteral("영상 불러오기와 타임라인 편집 기능을 준비하고 있습니다."));
+	const int uploadPage = addFeaturePage(QStringLiteral("홈페이지 업로드"),
+					      QStringLiteral("계정과 홈페이지를 연결하면 영상을 업로드할 수 있습니다."));
+	setCentralWidget(featurePages);
+
+	auto *featureBar = new QToolBar(QStringLiteral("EduTool 기능"), this);
+	featureBar->setObjectName(QStringLiteral("eduToolFeatureBar"));
+	featureBar->setMovable(false);
+	featureBar->setFloatable(false);
+	auto *brand = new QLabel(QStringLiteral("Et  EduTool Studio"), featureBar);
+	brand->setObjectName(QStringLiteral("eduToolBrand"));
+	featureBar->addWidget(brand);
+	featureBar->addSeparator();
+	auto *featureGroup = new QActionGroup(featureBar);
+	featureGroup->setExclusive(true);
+	auto addFeatureAction = [featureBar, featureGroup](const QString &title) {
+		auto *action = featureBar->addAction(title);
+		action->setCheckable(true);
+		featureGroup->addAction(action);
+		return action;
+	};
+	auto *recordPageAction = addFeatureAction(QStringLiteral("녹화"));
+	recordPageAction->setObjectName(QStringLiteral("eduToolRecordPageAction"));
+	auto *livePageAction = addFeatureAction(QStringLiteral("라이브 방송"));
+	auto *editPageAction = addFeatureAction(QStringLiteral("편집"));
+	auto *uploadPageAction = addFeatureAction(QStringLiteral("업로드"));
+	recordPageAction->setChecked(true);
+	featureBar->addSeparator();
+	auto *recordSettingsAction = featureBar->addAction(QStringLiteral("녹화 세부 설정"));
+	auto *liveSettingsAction = featureBar->addAction(QStringLiteral("방송 세부 설정"));
+	auto *previewBar = new QToolBar(QStringLiteral("미리보기 도구"), this);
+	previewBar->setObjectName(QStringLiteral("eduToolPreviewBar"));
+	previewBar->setMovable(false);
+	previewBar->setFloatable(false);
+	auto *previewFullscreenAction = previewBar->addAction(QStringLiteral("미리보기 전체화면"));
+	auto *compositionAction = previewBar->addAction(QStringLiteral("구도 조정"));
+	compositionAction->setEnabled(ui->actionEditTransform->isEnabled());
+	connect(ui->actionEditTransform, &QAction::changed, this, [this, compositionAction]() {
+		compositionAction->setEnabled(ui->actionEditTransform->isEnabled());
+	});
+	connect(compositionAction, &QAction::triggered, this, &OBSBasic::on_actionEditTransform_triggered);
+	auto *statusDock = new QDockWidget(QStringLiteral("장치 및 출력 상태"), this);
+	statusDock->setObjectName(QStringLiteral("eduToolStatusDock"));
+	statusDock->setMinimumWidth(220);
+	statusDock->setFeatures(QDockWidget::DockWidgetClosable);
+	statusDock->setAllowedAreas(Qt::RightDockWidgetArea);
+	auto *statusContent = new QWidget(statusDock);
+	auto *statusLayout = new QVBoxLayout(statusContent);
+	statusLayout->setContentsMargins(16, 16, 16, 16);
+	auto *panelVideoStatus = new QLabel(statusContent);
+	auto *panelSourceStatus = new QLabel(statusContent);
+	auto *panelActivityStatus = new QLabel(statusContent);
+	for (auto *label : {panelVideoStatus, panelSourceStatus, panelActivityStatus}) {
+		label->setWordWrap(true);
+		statusLayout->addWidget(label);
+	}
+	statusLayout->addStretch();
+	statusDock->setWidget(statusContent);
+	addDockWidget(Qt::RightDockWidgetArea, statusDock);
+	statusDock->toggleViewAction()->setText(QStringLiteral("상태 패널"));
+	previewBar->addAction(statusDock->toggleViewAction());
+	liveSettingsAction->setVisible(false);
+	connect(recordSettingsAction, &QAction::triggered, this, [this]() { OpenSettingsPage(3); });
+	connect(liveSettingsAction, &QAction::triggered, this, [this]() { OpenSettingsPage(2); });
+	connect(previewFullscreenAction, &QAction::triggered, this,
+		[this]() { OpenProjector(nullptr, 0, ProjectorType::Preview); });
+	auto *videoStatus = new QLabel(previewBar);
+	videoStatus->setObjectName(QStringLiteral("eduToolVideoStatus"));
+	previewBar->addWidget(videoStatus);
+	auto updateVideoStatus = [videoStatus, panelVideoStatus]() {
+		struct obs_video_info info = {};
+		videoStatus->setText(obs_get_video_info(&info) && info.fps_den
+					     ? QStringLiteral("%1×%2 · %3 FPS")
+						       .arg(info.output_width)
+						       .arg(info.output_height)
+						       .arg(double(info.fps_num) / info.fps_den, 0, 'f', 2)
+					     : QStringLiteral("영상 정보 준비 중"));
+		panelVideoStatus->setText(QStringLiteral("출력 영상\n%1").arg(videoStatus->text()));
+	};
+	auto *videoStatusTimer = new QTimer(this);
+	connect(videoStatusTimer, &QTimer::timeout, this, updateVideoStatus);
+	videoStatusTimer->start(5000);
+	updateVideoStatus();
+
+	auto *activityStatus = new QLabel(QStringLiteral("녹화·방송 대기"), featureBar);
+	activityStatus->setObjectName(QStringLiteral("eduToolActivityStatus"));
+	featureBar->addWidget(activityStatus);
+	auto *sourceStatus = new QLabel(statusBar());
+	sourceStatus->setObjectName(QStringLiteral("eduToolSourceStatus"));
+	statusBar()->addWidget(sourceStatus);
+	auto *errorStatus = new QLabel(statusBar());
+	errorStatus->setObjectName(QStringLiteral("eduToolErrorStatus"));
+	errorStatus->setTextFormat(Qt::PlainText);
+	errorStatus->setMaximumWidth(420);
+	statusBar()->addWidget(errorStatus);
+	auto *errorSettings = new QPushButton(QStringLiteral("설정 열기"), statusBar());
+	errorSettings->setObjectName(QStringLiteral("eduToolErrorSettings"));
+	statusBar()->addWidget(errorSettings);
+	connect(errorSettings, &QPushButton::clicked, this,
+		[this, errorSettings]() { OpenSettingsPage(errorSettings->property("settingsPage").toInt()); });
+	errorStatus->hide();
+	errorSettings->hide();
+	addToolBar(Qt::TopToolBarArea, featureBar);
+	addToolBarBreak(Qt::TopToolBarArea);
+	addToolBar(Qt::TopToolBarArea, previewBar);
+	auto updateSourceStatus = [sourceStatus, panelSourceStatus]() {
+		struct CameraState {
+			int configured = 0;
+			int connected = 0;
+		} camera;
+		obs_enum_sources(
+			[](void *data, obs_source_t *source) {
+				auto *state = static_cast<CameraState *>(data);
+				if (strcmp(obs_source_get_id(source), "dshow_input") == 0) {
+					++state->configured;
+					state->connected += EduToolDeviceState(source, "video_device_id") ==
+							    QStringLiteral("연결됨");
+				}
+				return true;
+			},
+			&camera);
+		auto audioState = [](uint32_t first, uint32_t last) {
+			int configured = 0;
+			int connected = 0;
+			for (uint32_t channel = first; channel <= last; ++channel) {
+				OBSSourceAutoRelease source = obs_get_output_source(channel);
+				if (source) {
+					++configured;
+					connected += EduToolDeviceState(source, "device_id") == QStringLiteral("연결됨");
+				}
+			}
+			return !configured ? QStringLiteral("미설정")
+				 : connected == configured ? QStringLiteral("연결됨")
+				 : connected ? QStringLiteral("일부 연결 끊김") : QStringLiteral("연결 끊김");
+		};
+		const QString cameraText = !camera.configured ? QStringLiteral("미설정")
+					 : camera.connected == camera.configured ? QStringLiteral("연결됨")
+					 : camera.connected ? QStringLiteral("일부 연결 끊김")
+							    : QStringLiteral("연결 끊김");
+		sourceStatus->setText(QStringLiteral("카메라: %1  ·  마이크: %2  ·  PC 소리: %3")
+					      .arg(cameraText, audioState(3, 6), audioState(1, 2)));
+		sourceStatus->setToolTip(QStringLiteral("OBS에서 선택한 장치가 현재 장치 목록에 있는지 확인합니다."));
+		panelSourceStatus->setText(QStringLiteral("카메라: %1\n\n마이크: %2\n\nPC 소리: %3")
+						  .arg(cameraText, audioState(3, 6), audioState(1, 2)));
+	};
+	auto *sourceStatusTimer = new QTimer(this);
+	connect(sourceStatusTimer, &QTimer::timeout, this, updateSourceStatus);
+	sourceStatusTimer->start(5000);
+	updateSourceStatus();
+
+	/* The common OBS settings entry is replaced by feature-specific entries. */
+	ui->action_Settings->setVisible(false);
+	if (auto *settingsButton = controls->findChild<QPushButton *>(QStringLiteral("settingsButton"))) {
+		settingsButton->setVisible(false);
+	}
+
+	auto dockVisibility = std::make_shared<QList<QPair<QDockWidget *, bool>>>();
+	auto switchFeature = [this, featurePages, dockVisibility, recordSettingsAction, liveSettingsAction,
+			   previewBar](
+			     int page, bool recording, bool live) {
+		const bool leavingPreview = featurePages->currentIndex() == 0 && page != 0;
+		const bool returningToPreview = featurePages->currentIndex() != 0 && page == 0;
+		if (leavingPreview) {
+			dockVisibility->clear();
+			for (auto *dock : findChildren<QDockWidget *>(QString(), Qt::FindDirectChildrenOnly)) {
+				dockVisibility->append(qMakePair(dock, dock->isVisible()));
+				dock->hide();
+			}
+		}
+		featurePages->setCurrentIndex(page);
+		if (returningToPreview) {
+			for (const auto &[dock, wasVisible] : *dockVisibility) {
+				dock->setVisible(wasVisible);
+			}
+		}
+		recordSettingsAction->setVisible(recording);
+		liveSettingsAction->setVisible(live);
+		previewBar->setVisible(recording || live);
+	};
+	connect(recordPageAction, &QAction::triggered, this, [switchFeature]() { switchFeature(0, true, false); });
+	connect(livePageAction, &QAction::triggered, this, [switchFeature]() { switchFeature(0, false, true); });
+	connect(editPageAction, &QAction::triggered, this,
+		[=]() { switchFeature(editPage, false, false); });
+	connect(uploadPageAction, &QAction::triggered, this,
+		[=]() { switchFeature(uploadPage, false, false); });
+
+	auto updateActivityStatus = [this, activityStatus, panelActivityStatus]() {
+		const bool recording = RecordingActive();
+		const bool streaming = StreamingActive();
+		activityStatus->setText(streaming && recording ? QStringLiteral("● LIVE  ● REC")
+					   : streaming        ? QStringLiteral("● LIVE")
+					   : recording        ? QStringLiteral("● REC")
+							      : QStringLiteral("녹화·방송 대기"));
+		panelActivityStatus->setText(activityStatus->text());
+	};
+	connect(this, &OBSBasic::RecordingStarted, this, updateActivityStatus);
+	connect(this, &OBSBasic::RecordingStopped, this, updateActivityStatus);
+	connect(this, &OBSBasic::StreamingStarted, this, updateActivityStatus);
+	connect(this, &OBSBasic::StreamingStopped, this, updateActivityStatus);
+	auto *activityStatusTimer = new QTimer(this);
+	connect(activityStatusTimer, &QTimer::timeout, this, updateActivityStatus);
+	activityStatusTimer->start(1000);
 
 	startingDockLayout = saveState();
 
@@ -1393,6 +1656,9 @@ void OBSBasic::OBSInit()
 
 void OBSBasic::OnFirstLoad()
 {
+	if (auto *previewBar = findChild<QToolBar *>(QStringLiteral("eduToolPreviewBar"))) {
+		insertToolBarBreak(previewBar);
+	}
 	OnEvent(OBS_FRONTEND_EVENT_FINISHED_LOADING);
 
 #ifdef WHATSNEW_ENABLED
@@ -1416,6 +1682,35 @@ void OBSBasic::OnFirstLoad()
 }
 
 OBSBasic::~OBSBasic() {}
+
+void OBSBasic::ShowEduToolError(const QString &message, int settingsPage)
+{
+	auto *errorStatus = findChild<QLabel *>(QStringLiteral("eduToolErrorStatus"));
+	auto *errorSettings = findChild<QPushButton *>(QStringLiteral("eduToolErrorSettings"));
+	auto *sourceStatus = findChild<QLabel *>(QStringLiteral("eduToolSourceStatus"));
+	if (!errorStatus || !errorSettings || !sourceStatus) {
+		return;
+	}
+	errorStatus->setText(errorStatus->fontMetrics().elidedText(message, Qt::ElideRight, 410));
+	errorStatus->setToolTip(message);
+	errorSettings->setProperty("settingsPage", settingsPage);
+	sourceStatus->hide();
+	errorStatus->show();
+	errorSettings->show();
+}
+
+void OBSBasic::ClearEduToolError()
+{
+	if (auto *errorStatus = findChild<QLabel *>(QStringLiteral("eduToolErrorStatus"))) {
+		errorStatus->hide();
+	}
+	if (auto *errorSettings = findChild<QPushButton *>(QStringLiteral("eduToolErrorSettings"))) {
+		errorSettings->hide();
+	}
+	if (auto *sourceStatus = findChild<QLabel *>(QStringLiteral("eduToolSourceStatus"))) {
+		sourceStatus->show();
+	}
+}
 
 void OBSBasic::applicationShutdown() noexcept
 {
@@ -1753,6 +2048,13 @@ void OBSBasic::closeEvent(QCloseEvent *event)
 	QWidget::closeEvent(event);
 	if (!event->isAccepted()) {
 		return;
+	}
+	/* Persist the normal OBS dock layout even if an EduTool page is open. */
+	if (auto *featurePages = findChild<QStackedWidget *>(QStringLiteral("eduToolFeaturePages"));
+	    featurePages && featurePages->currentIndex() != 0) {
+		if (auto *recordPageAction = findChild<QAction *>(QStringLiteral("eduToolRecordPageAction"))) {
+			recordPageAction->trigger();
+		}
 	}
 
 	closeWindow();
@@ -2126,11 +2428,7 @@ void OBSBasic::UpdateTitleBar()
 	const char *profile = config_get_string(App()->GetUserConfig(), "Basic", "Profile");
 	const char *sceneCollection = config_get_string(App()->GetUserConfig(), "Basic", "SceneCollection");
 
-	name << "OBS ";
-	if (previewProgramMode) {
-		name << "Studio ";
-	}
-
+	name << "EduTool Studio ";
 	name << App()->GetVersionString(false);
 	if (safe_mode) {
 		name << " (" << Str("TitleBar.SafeMode") << ")";

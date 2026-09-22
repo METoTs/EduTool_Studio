@@ -623,6 +623,9 @@ private slots:
 	void on_actionFullscreenInterface_triggered();
 	void on_actionRemux_triggered();
 	void on_action_Settings_triggered();
+	void OpenSettingsPage(int page);
+	void ShowEduToolError(const QString &message, int settingsPage);
+	void ClearEduToolError();
 	void on_actionShowMacPermissions_triggered();
 	void on_actionShowLogs_triggered();
 	void on_actionUploadCurrentLog_triggered();

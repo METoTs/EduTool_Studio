@@ -36,6 +36,7 @@ void OBSBasic::DisplayStreamStartError()
 							    : QTStr("Output.StartFailedGeneric");
 
 	emit StreamingStopped();
+	ShowEduToolError(QStringLiteral("방송 오류: %1").arg(message), 2);
 
 	if (sysTrayStream) {
 		sysTrayStream->setText(QTStr("Basic.Main.StartStreaming"));
@@ -241,6 +242,7 @@ void OBSBasic::StreamDelayStopping(int sec)
 
 void OBSBasic::StreamingStart()
 {
+	ClearEduToolError();
 	emit StreamingStarted();
 	OBSOutputAutoRelease output = obs_frontend_get_streaming_output();
 	ui->statusbar->StreamStarted(output);
@@ -343,6 +345,13 @@ void OBSBasic::StreamingStop(int code, QString last_error)
 		dstr_printf(errorMessage, "%s\n\n%s", errorDescription, QT_TO_UTF8(last_error));
 	} else {
 		dstr_copy(errorMessage, errorDescription);
+	}
+	if (code != OBS_OUTPUT_SUCCESS) {
+		const QString reason = !last_error.isEmpty()
+					       ? last_error
+					       : encode_error ? QTStr("Output.StreamEncodeError.Msg")
+							      : QT_UTF8(errorDescription);
+		ShowEduToolError(QStringLiteral("방송 오류: %1").arg(reason), 2);
 	}
 
 	ui->statusbar->StreamStopped();
