@@ -940,6 +940,15 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent, int initialPage)
 	ui->advancedMsg2->setVisible(false);
 	if (initialPage >= 0 && initialPage < Pages::NUM_PAGES) {
 		ui->listWidget->setCurrentRow(initialPage);
+		ui->listWidget->hide();
+		setWindowTitle(initialPage == Pages::OUTPUT ? QStringLiteral("녹화 세부 설정")
+			: initialPage == Pages::AUDIO ? QStringLiteral("오디오 장치 구성")
+			: initialPage == Pages::STREAM ? QStringLiteral("방송 연결 설정") : windowTitle());
+		if (initialPage == Pages::OUTPUT) {
+			ui->simpleStreamingGroupBox->hide();
+			ui->advOutTabs->setTabVisible(ui->advOutTabs->indexOf(ui->advOutputStreamTab), false);
+			ui->advOutTabs->setCurrentWidget(ui->advOutputRecordTab);
+		}
 	}
 	auto *resetRecording = new QPushButton(QStringLiteral("녹화 기본 설정 초기화"), ui->simpleRecordingGroupBox);
 	resetRecording->setObjectName(QStringLiteral("eduToolResetRecording"));
@@ -961,6 +970,7 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent, int initialPage)
 		resetCombo(ui->simpleOutRecEncoder, "RecEncoder");
 		resetCombo(ui->simpleOutRecAEncoder, "RecAudioEncoder");
 		resetCombo(ui->simpleOutRecFormat, "RecFormat2");
+		ui->simpleFlvTrack1->setChecked(true);
 		ui->simpleOutMuxCustom->setText(defaultText("MuxerCustom"));
 		const uint64_t tracks = config_get_default_uint(main->Config(), "SimpleOutput", "RecTracks");
 		int track = 0;
@@ -968,6 +978,57 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent, int initialPage)
 				   ui->simpleOutRecTrack4, ui->simpleOutRecTrack5, ui->simpleOutRecTrack6}) {
 			check->setChecked(tracks & (1ULL << track++));
 		}
+	});
+	auto *resetAdvancedRecording = new QPushButton(QStringLiteral("고급 녹화 기본 설정 초기화"), ui->advOutputRecordTab);
+	resetAdvancedRecording->setEnabled(!obs_video_active());
+	ui->verticalLayout_11->addWidget(resetAdvancedRecording);
+	connect(resetAdvancedRecording, &QPushButton::clicked, this, [this]() {
+		auto text = [this](const char *key) {
+			const char *value = config_get_default_string(main->Config(), "AdvOut", key);
+			return value ? QString::fromUtf8(value) : QString();
+		};
+		auto combo = [&text](QComboBox *control, const char *key) {
+			const int index = control->findData(text(key));
+			if (index >= 0) control->setCurrentIndex(index);
+		};
+		ui->advOutRecType->setCurrentIndex(0);
+		ui->advOutRecPath->setText(text("RecFilePath"));
+		ui->advOutNoSpace->setChecked(config_get_default_bool(main->Config(), "AdvOut", "RecFileNameWithoutSpace"));
+		combo(ui->advOutRecFormat, "RecFormat2");
+		combo(ui->advOutRecEncoder, "RecEncoder");
+		combo(ui->advOutRecAEncoder, "RecAudioEncoder");
+		ui->advOutRecRescale->setCurrentText(text("RecRescaleRes"));
+		const int filter = ui->advOutRecRescaleFilter->findData(int(config_get_default_int(main->Config(), "AdvOut", "RecRescaleFilter")));
+		if (filter >= 0) ui->advOutRecRescaleFilter->setCurrentIndex(filter);
+		ui->advOutMuxCustom->setText(text("RecMuxerCustom"));
+		ui->advOutSplitFile->setChecked(config_get_default_bool(main->Config(), "AdvOut", "RecSplitFile"));
+		ui->advOutSplitFileType->setCurrentIndex(0);
+		ui->advOutSplitFileTime->setValue(int(config_get_default_int(main->Config(), "AdvOut", "RecSplitFileTime")));
+		ui->advOutSplitFileSize->setValue(int(config_get_default_int(main->Config(), "AdvOut", "RecSplitFileSize")));
+		const auto tracks = config_get_default_uint(main->Config(), "AdvOut", "RecTracks");
+		int bit = 0;
+		for (auto *track : {ui->advOutRecTrack1, ui->advOutRecTrack2, ui->advOutRecTrack3, ui->advOutRecTrack4, ui->advOutRecTrack5, ui->advOutRecTrack6})
+			track->setChecked(tracks & (1ULL << bit++));
+		ui->flvTrack1->setChecked(true);
+		ui->advOutFFType->setCurrentIndex(0);
+		ui->advOutFFRecPath->setText(text("FFFilePath"));
+		ui->advOutFFNoSpace->setChecked(config_get_default_bool(main->Config(), "AdvOut", "FFFileNameWithoutSpace"));
+		ui->advOutFFURL->setText(text("FFURL"));
+		ui->advOutFFFormat->setCurrentIndex(0);
+		ui->advOutFFMCfg->setText(text("FFMCustom"));
+		ui->advOutFFVBitrate->setValue(int(config_get_default_int(main->Config(), "AdvOut", "FFVBitrate")));
+		ui->advOutFFVGOPSize->setValue(int(config_get_default_int(main->Config(), "AdvOut", "FFVGOPSize")));
+		ui->advOutFFUseRescale->setChecked(false);
+		ui->advOutFFIgnoreCompat->setChecked(false);
+		ui->advOutFFRescale->setCurrentText(text("FFRescaleRes"));
+		ui->advOutFFVEncoder->setCurrentIndex(0);
+		ui->advOutFFVCfg->setText(text("FFVCustom"));
+		ui->advOutFFABitrate->setValue(int(config_get_default_int(main->Config(), "AdvOut", "FFABitrate")));
+		ui->advOutFFAEncoder->setCurrentIndex(0);
+		ui->advOutFFACfg->setText(text("FFACustom"));
+		int channel = 0;
+		for (auto *track : {ui->advOutFFTrack1, ui->advOutFFTrack2, ui->advOutFFTrack3, ui->advOutFFTrack4, ui->advOutFFTrack5, ui->advOutFFTrack6})
+			track->setChecked(config_get_default_uint(main->Config(), "AdvOut", "FFAudioMixes") & (1ULL << channel++));
 	});
 }
 
