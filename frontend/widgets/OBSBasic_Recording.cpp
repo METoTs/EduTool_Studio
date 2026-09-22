@@ -410,6 +410,7 @@ void OBSBasic::UpdateIsRecordingPausable()
 void OBSBasic::DiskSpaceMessage()
 {
 	blog(LOG_ERROR, "Recording stopped because of low disk space");
+	ShowEduToolError(QStringLiteral("녹화 오류: 저장 공간이 부족합니다. 저장 위치를 변경하거나 공간을 확보하세요."), 3);
 
 	OBSMessageBox::critical(this, QTStr("Output.RecordNoSpace.Title"), QTStr("Output.RecordNoSpace.Msg"));
 }

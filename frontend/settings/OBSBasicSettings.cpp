@@ -941,6 +941,34 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent, int initialPage)
 	if (initialPage >= 0 && initialPage < Pages::NUM_PAGES) {
 		ui->listWidget->setCurrentRow(initialPage);
 	}
+	auto *resetRecording = new QPushButton(QStringLiteral("녹화 기본 설정 초기화"), ui->simpleRecordingGroupBox);
+	resetRecording->setObjectName(QStringLiteral("eduToolResetRecording"));
+	resetRecording->setToolTip(QStringLiteral("녹화 항목만 기본값으로 되돌립니다. 확인 또는 적용을 눌러 저장하고, 취소로 되돌릴 수 있습니다."));
+	resetRecording->setEnabled(!obs_video_active());
+	ui->formLayout_6->addRow(resetRecording);
+	connect(resetRecording, &QPushButton::clicked, this, [this]() {
+		auto defaultText = [this](const char *key) {
+			return QString::fromUtf8(config_get_default_string(main->Config(), "SimpleOutput", key));
+		};
+		auto resetCombo = [&defaultText](QComboBox *combo, const char *key) {
+			const int index = combo->findData(defaultText(key));
+			if (index >= 0)
+				combo->setCurrentIndex(index);
+		};
+		ui->simpleOutputPath->setText(defaultText("FilePath"));
+		ui->simpleNoSpace->setChecked(config_get_default_bool(main->Config(), "SimpleOutput", "FileNameWithoutSpace"));
+		resetCombo(ui->simpleOutRecQuality, "RecQuality");
+		resetCombo(ui->simpleOutRecEncoder, "RecEncoder");
+		resetCombo(ui->simpleOutRecAEncoder, "RecAudioEncoder");
+		resetCombo(ui->simpleOutRecFormat, "RecFormat2");
+		ui->simpleOutMuxCustom->setText(defaultText("MuxerCustom"));
+		const uint64_t tracks = config_get_default_uint(main->Config(), "SimpleOutput", "RecTracks");
+		int track = 0;
+		for (auto *check : {ui->simpleOutRecTrack1, ui->simpleOutRecTrack2, ui->simpleOutRecTrack3,
+				   ui->simpleOutRecTrack4, ui->simpleOutRecTrack5, ui->simpleOutRecTrack6}) {
+			check->setChecked(tracks & (1ULL << track++));
+		}
+	});
 }
 
 OBSBasicSettings::~OBSBasicSettings()
