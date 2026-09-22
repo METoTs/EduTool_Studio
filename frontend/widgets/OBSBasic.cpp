@@ -62,6 +62,10 @@
 #include <QCheckBox>
 #include <QGroupBox>
 #include <QScrollArea>
+#include <QSpinBox>
+#include <QFileDialog>
+#include <QFileInfo>
+#include <QStorageInfo>
 #include <QDialog>
 #include <QSignalBlocker>
 #include <QLabel>
@@ -499,6 +503,59 @@ OBSBasic::OBSBasic(QWidget *parent) : OBSMainWindow(parent), undo_s(ui), ui(new 
 	auto *audioSettings = new QPushButton(QStringLiteral("오디오 세부 설정"), statusContent);
 	statusLayout->addWidget(audioSettings);
 	connect(audioSettings, &QPushButton::clicked, this, &OBSBasic::OpenEduToolAudioSettings);
+	auto *delayLabel = new QLabel(QStringLiteral("녹화 시작 지연"), statusContent);
+	statusLayout->addWidget(delayLabel);
+	auto *recordDelay = new QSpinBox(statusContent);
+	recordDelay->setRange(0, 60);
+	recordDelay->setSuffix(QStringLiteral(" 초"));
+	recordDelay->setSpecialValueText(QStringLiteral("즉시 시작"));
+	recordDelay->setAccessibleName(QStringLiteral("녹화 시작 지연 시간"));
+	statusLayout->addWidget(recordDelay);
+	connect(recordDelay, &QSpinBox::valueChanged, this, [this](int value) {
+		const int previous = int(config_get_int(Config(), "EduTool", "RecordDelaySeconds"));
+		config_set_int(Config(), "EduTool", "RecordDelaySeconds", value);
+		if (activeConfiguration.SaveSafe("tmp") != CONFIG_SUCCESS) {
+			config_set_int(Config(), "EduTool", "RecordDelaySeconds", previous);
+			ShowEduToolError(QStringLiteral("녹화 지연 설정을 저장하지 못했습니다. 프로파일의 쓰기 권한을 확인하세요."), 3);
+		}
+	});
+	auto *delaySync = new QTimer(recordDelay);
+	connect(delaySync, &QTimer::timeout, recordDelay, [this, recordDelay]() {
+		QSignalBlocker blocker(recordDelay);
+		recordDelay->setValue(int(config_get_int(Config(), "EduTool", "RecordDelaySeconds")));
+		recordDelay->setEnabled(!RecordingActive() && !eduToolRecordDelayTimer && !eduToolRecordingStartPending);
+	});
+	delaySync->start(500);
+	auto *folderPath = new QLabel(statusContent);
+	folderPath->setTextFormat(Qt::PlainText);
+	folderPath->setWordWrap(true);
+	statusLayout->addWidget(folderPath);
+	auto *folderSpace = new QLabel(statusContent);
+	folderSpace->setWordWrap(true);
+	statusLayout->addWidget(folderSpace);
+	auto *openFolder = new QPushButton(QStringLiteral("저장 폴더 열기"), statusContent);
+	auto *changeFolder = new QPushButton(QStringLiteral("저장 위치 변경"), statusContent);
+	statusLayout->addWidget(openFolder);
+	statusLayout->addWidget(changeFolder);
+	connect(openFolder, &QPushButton::clicked, this, &OBSBasic::on_actionShow_Recordings_triggered);
+	connect(changeFolder, &QPushButton::clicked, this, &OBSBasic::ChangeEduToolRecordingFolder);
+	auto updateFolder = [this, folderPath, folderSpace, openFolder, changeFolder]() {
+		const bool local = !IsFFmpegOutputToURL();
+		const char *configuredPath = GetCurrentOutputPath();
+		const QString path = configuredPath ? QString::fromUtf8(configuredPath) : QString();
+		folderPath->setText(local ? QStringLiteral("저장 위치\n%1").arg(path) : QStringLiteral("네트워크 출력 사용 중"));
+		folderPath->setToolTip(path);
+		const QFileInfo directory(path);
+		openFolder->setEnabled(local && directory.isDir());
+		changeFolder->setEnabled(local && !RecordingActive() && !eduToolRecordDelayTimer && !eduToolRecordingStartPending);
+		QStorageInfo storage(path);
+		folderSpace->setText(local && directory.isDir() && storage.isValid() && storage.isReady()
+			? QStringLiteral("남은 공간: %1 GB").arg(double(storage.bytesAvailable()) / (1024.0 * 1024.0 * 1024.0), 0, 'f', 1)
+			: QStringLiteral("저장 공간을 확인할 수 없습니다."));
+	};
+	auto *folderTimer = new QTimer(statusContent);
+	connect(folderTimer, &QTimer::timeout, statusContent, updateFolder);
+	folderTimer->start(3000);
 	statusDock->setWidget(statusContent);
 	addDockWidget(Qt::RightDockWidgetArea, statusDock);
 	statusDock->toggleViewAction()->setText(QStringLiteral("상태 패널"));
@@ -2331,6 +2388,7 @@ void OBSBasic::closeEvent(QCloseEvent *event)
 	if (!event->isAccepted()) {
 		return;
 	}
+	CancelEduToolRecordingDelay();
 	/* Persist the normal OBS dock layout even if an EduTool page is open. */
 	if (auto *featurePages = findChild<QStackedWidget *>(QStringLiteral("eduToolFeaturePages"));
 	    featurePages && featurePages->currentIndex() != 0) {

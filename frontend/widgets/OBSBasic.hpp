@@ -629,6 +629,7 @@ private slots:
 	void OpenEduToolSourceManager();
 	void OpenEduToolCameraSettings();
 	void OpenEduToolAudioSettings();
+	void ChangeEduToolRecordingFolder();
 	void on_actionShowMacPermissions_triggered();
 	void on_actionShowLogs_triggered();
 	void on_actionUploadCurrentLog_triggered();
@@ -1003,6 +1004,8 @@ public:
 	 */
 private:
 	QPointer<QTimer> diskFullTimer;
+	QPointer<QTimer> eduToolRecordDelayTimer;
+	bool eduToolRecordingStartPending = false;
 	bool recordingStopping = false;
 	bool recordingStarted = false;
 	bool isRecordingPausable = false;
@@ -1010,6 +1013,8 @@ private:
 
 	void AutoRemux(QString input, bool no_show = false);
 	void UpdateIsRecordingPausable();
+	void StartRecordingImmediately();
+	void CancelEduToolRecordingDelay();
 
 	bool LowDiskSpace();
 	void DiskSpaceMessage();

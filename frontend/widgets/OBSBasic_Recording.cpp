@@ -26,6 +26,32 @@
 
 #include <QDesktopServices>
 #include <QFileInfo>
+#include <QProgressDialog>
+#include <QElapsedTimer>
+#include <QFileDialog>
+#include <QTimer>
+#include <algorithm>
+
+void OBSBasic::ChangeEduToolRecordingFolder()
+{
+	if (RecordingActive() || eduToolRecordDelayTimer || eduToolRecordingStartPending || IsFFmpegOutputToURL())
+		return;
+	const char *currentPath = GetCurrentOutputPath();
+	const QString path = QFileDialog::getExistingDirectory(this, QStringLiteral("녹화 저장 폴더 선택"),
+		currentPath ? QString::fromUtf8(currentPath) : QString());
+	if (path.isEmpty() || RecordingActive() || eduToolRecordDelayTimer || eduToolRecordingStartPending)
+		return;
+	const bool advanced = strcmp(config_get_string(Config(), "Output", "Mode"), "Advanced") == 0;
+	const bool ffmpeg = advanced && strcmp(config_get_string(Config(), "AdvOut", "RecType"), "FFmpeg") == 0;
+	const char *section = advanced ? "AdvOut" : "SimpleOutput";
+	const char *key = advanced ? (ffmpeg ? "FFFilePath" : "RecFilePath") : "FilePath";
+	const std::string previous = config_get_string(Config(), section, key);
+	config_set_string(Config(), section, key, path.toUtf8().constData());
+	if (activeConfiguration.SaveSafe("tmp") != CONFIG_SUCCESS) {
+		config_set_string(Config(), section, key, previous.c_str());
+		ShowEduToolError(QStringLiteral("저장 위치 변경을 저장하지 못했습니다. 프로파일의 쓰기 권한을 확인하세요."), 3);
+	}
+}
 
 void OBSBasic::on_actionShow_Recordings_triggered()
 {
@@ -36,7 +62,9 @@ void OBSBasic::on_actionShow_Recordings_triggered()
 				       : config_get_string(activeConfiguration, "AdvOut", "RecFilePath");
 	const char *path = strcmp(mode, "Advanced") ? config_get_string(activeConfiguration, "SimpleOutput", "FilePath")
 						    : adv_path;
-	QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+	if (!path || !QFileInfo(QString::fromUtf8(path)).isDir() ||
+	    !QDesktopServices::openUrl(QUrl::fromLocalFile(QString::fromUtf8(path))))
+		ShowEduToolError(QStringLiteral("저장 폴더를 열 수 없습니다. 녹화 저장 위치를 확인하세요."), 3);
 }
 
 #define RECORDING_START "==== Recording Start ==============================================="
@@ -112,7 +140,57 @@ void OBSBasic::AutoRemux(QString input, bool no_show)
 
 void OBSBasic::StartRecording()
 {
-	if (outputHandler->RecordingActive()) {
+	if (RecordingActive() || disableOutputsRef || eduToolRecordingStartPending || eduToolRecordDelayTimer)
+		return;
+	const int seconds = int(std::clamp<int64_t>(config_get_int(Config(), "EduTool", "RecordDelaySeconds"), 0, 60));
+	if (!seconds) {
+		StartRecordingImmediately();
+		return;
+	}
+	auto *countdown = new QProgressDialog(QStringLiteral("%1초 후 녹화를 시작합니다.").arg(seconds),
+		QStringLiteral("지연 녹화 취소"), 0, seconds * 1000, this);
+	countdown->setWindowTitle(QStringLiteral("녹화 시작 대기"));
+	countdown->setWindowModality(Qt::NonModal);
+	countdown->setAutoClose(false);
+	countdown->setAutoReset(false);
+	countdown->setMinimumDuration(0);
+	auto *timer = new QTimer(countdown);
+	eduToolRecordDelayTimer = timer;
+	auto elapsed = std::make_shared<QElapsedTimer>();
+	elapsed->start();
+	connect(countdown, &QProgressDialog::canceled, this, &OBSBasic::CancelEduToolRecordingDelay);
+	connect(timer, &QTimer::timeout, this, [this, countdown, timer, seconds, elapsed]() {
+		if (countdown->wasCanceled()) {
+			CancelEduToolRecordingDelay();
+			return;
+		}
+		const auto remaining = seconds * 1000 - elapsed->elapsed();
+		countdown->setValue(int(std::min<qint64>(elapsed->elapsed(), seconds * 1000)));
+		countdown->setLabelText(QStringLiteral("%1초 후 녹화를 시작합니다.").arg(std::max<qint64>(0, (remaining + 999) / 1000)));
+		if (remaining <= 0) {
+			timer->stop();
+			eduToolRecordDelayTimer = nullptr;
+			countdown->hide();
+			countdown->deleteLater();
+			StartRecordingImmediately();
+		}
+	});
+	timer->start(100);
+	countdown->show();
+}
+
+void OBSBasic::CancelEduToolRecordingDelay()
+{
+	if (!eduToolRecordDelayTimer)
+		return;
+	eduToolRecordDelayTimer->stop();
+	eduToolRecordDelayTimer->parent()->deleteLater();
+	eduToolRecordDelayTimer = nullptr;
+}
+
+void OBSBasic::StartRecordingImmediately()
+{
+	if (outputHandler->RecordingActive() || eduToolRecordingStartPending) {
 		return;
 	}
 	if (disableOutputsRef) {
@@ -135,7 +213,9 @@ void OBSBasic::StartRecording()
 
 	SaveProject();
 
-	outputHandler->StartRecording();
+	eduToolRecordingStartPending = true;
+	if (!outputHandler->StartRecording())
+		eduToolRecordingStartPending = false;
 }
 
 void OBSBasic::RecordStopping()
@@ -152,6 +232,7 @@ void OBSBasic::RecordStopping()
 
 void OBSBasic::StopRecording()
 {
+	CancelEduToolRecordingDelay();
 	SaveProject();
 
 	if (outputHandler->RecordingActive()) {
@@ -163,6 +244,7 @@ void OBSBasic::StopRecording()
 
 void OBSBasic::RecordingStart()
 {
+	eduToolRecordingStartPending = false;
 	ClearEduToolError();
 	ui->statusbar->RecordingStarted(outputHandler->fileOutput);
 	emit RecordingStarted(isRecordingPausable);
@@ -185,6 +267,7 @@ void OBSBasic::RecordingStart()
 
 void OBSBasic::RecordingStop(int code, QString last_error)
 {
+	eduToolRecordingStartPending = false;
 	if (code != OBS_OUTPUT_SUCCESS) {
 		QString reason = last_error;
 		if (reason.isEmpty()) {
@@ -242,8 +325,13 @@ void OBSBasic::RecordingStop(int code, QString last_error)
 	} else if (code == OBS_OUTPUT_SUCCESS) {
 		if (outputHandler) {
 			std::string path = outputHandler->lastRecordingPath;
-			QString str = QTStr("Basic.StatusBar.RecordingSavedTo");
-			ShowStatusBarMessage(str.arg(QT_UTF8(path.c_str())));
+			const QFileInfo file(QT_UTF8(path.c_str()));
+			if (file.isFile() && file.size() > 0) {
+				QString str = QTStr("Basic.StatusBar.RecordingSavedTo");
+				ShowStatusBarMessage(str.arg(file.absoluteFilePath()));
+			} else if (!IsFFmpegOutputToURL()) {
+				ShowEduToolError(QStringLiteral("녹화 파일을 확인할 수 없습니다. 저장 위치와 녹화 로그를 확인하세요."), 3);
+			}
 		}
 	}
 
@@ -253,7 +341,8 @@ void OBSBasic::RecordingStop(int code, QString last_error)
 		diskFullTimer->stop();
 	}
 
-	AutoRemux(outputHandler->lastRecordingPath.c_str());
+	if (code == OBS_OUTPUT_SUCCESS)
+		AutoRemux(outputHandler->lastRecordingPath.c_str());
 
 	OnDeactivate();
 }
@@ -268,6 +357,10 @@ void OBSBasic::RecordingFileChanged(QString lastRecordingPath)
 
 void OBSBasic::RecordActionTriggered()
 {
+	if (eduToolRecordDelayTimer) {
+		CancelEduToolRecordingDelay();
+		return;
+	}
 	if (outputHandler->RecordingActive()) {
 		bool confirm = config_get_bool(App()->GetUserConfig(), "BasicWindow", "WarnBeforeStoppingRecord");
 
