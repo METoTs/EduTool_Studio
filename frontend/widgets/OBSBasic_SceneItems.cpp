@@ -30,8 +30,16 @@
 #include <qt-wrappers.hpp>
 
 #include <QWidgetAction>
+#include <QInputDialog>
+#include <QLabel>
+#include <QListWidget>
+#include <QPushButton>
+#include <QSignalBlocker>
+#include <QTimer>
+#include <QVBoxLayout>
 
 #include <sstream>
+#include <algorithm>
 
 using namespace std;
 
@@ -837,6 +845,219 @@ void OBSBasic::AddSourceDialog()
 void OBSBasic::on_actionAddSource_triggered()
 {
 	AddSourceDialog();
+}
+
+void OBSBasic::OpenEduToolSourceManager()
+{
+	if (auto *existing = findChild<QDialog *>(QStringLiteral("eduToolSourceManager"))) {
+		existing->show();
+		existing->raise();
+		existing->activateWindow();
+		return;
+	}
+	auto *dialog = new QDialog(this);
+	dialog->setObjectName(QStringLiteral("eduToolSourceManager"));
+	dialog->setWindowTitle(QStringLiteral("소스 관리"));
+	dialog->setAttribute(Qt::WA_DeleteOnClose);
+	dialog->resize(720, 520);
+	auto *layout = new QVBoxLayout(dialog);
+	layout->setContentsMargins(24, 24, 24, 24);
+	layout->setSpacing(14);
+	auto *heading = new QLabel(QStringLiteral("소스 관리"), dialog);
+	heading->setObjectName(QStringLiteral("eduToolSourceHeading"));
+	layout->addWidget(heading);
+	auto *hint = new QLabel(QStringLiteral("녹화에 사용할 카메라, 화면, 미디어, 이미지, 텍스트를 관리합니다.\n"
+					     "체크 표시로 노출을 바꾸고, 위·아래 버튼으로 겹치는 순서를 조정하세요."), dialog);
+	hint->setWordWrap(true);
+	layout->addWidget(hint);
+	auto *list = new QListWidget(dialog);
+	list->setObjectName(QStringLiteral("eduToolSourceList"));
+	list->setSelectionMode(QAbstractItemView::SingleSelection);
+	layout->addWidget(list, 1);
+	auto *details = new QLabel(dialog);
+	details->setTextFormat(Qt::PlainText);
+	details->setWordWrap(true);
+	layout->addWidget(details);
+	auto *actions = new QHBoxLayout;
+	layout->addLayout(actions);
+	auto button = [dialog, actions](const QString &text) {
+		auto *result = new QPushButton(text, dialog);
+		actions->addWidget(result);
+		return result;
+	};
+	auto *add = button(QStringLiteral("＋ 소스 추가"));
+	auto *propertiesButton = button(QStringLiteral("속성 열기"));
+	auto *up = button(QStringLiteral("위로"));
+	auto *down = button(QStringLiteral("아래로"));
+	auto *remove = button(QStringLiteral("제거"));
+	auto *placement = new QHBoxLayout;
+	layout->addLayout(placement);
+	auto *left = new QPushButton(QStringLiteral("왼쪽 하단 PIP"), dialog);
+	auto *right = new QPushButton(QStringLiteral("오른쪽 하단 PIP"), dialog);
+	auto *full = new QPushButton(QStringLiteral("전체 화면 배치"), dialog);
+	for (auto *control : {left, right, full})
+		placement->addWidget(control);
+	auto *close = new QPushButton(QStringLiteral("닫기"), dialog);
+	layout->addWidget(close, 0, Qt::AlignRight);
+	connect(close, &QPushButton::clicked, dialog, &QDialog::close);
+
+	// Hold references until the list is refreshed; never resolve an old row against a new scene.
+	auto items = std::make_shared<std::vector<OBSSceneItem>>();
+	auto selected = [this, list, items]() -> OBSSceneItem {
+		const int row = list->currentRow();
+		if (row < 0 || size_t(row) >= items->size())
+			return nullptr;
+		OBSSceneItem item = items->at(row);
+		for (int index = 0; index < ui->sources->model()->rowCount(); ++index) {
+			if (ui->sources->Get(index) == item && obs_sceneitem_get_scene(item))
+				return item;
+		}
+		return nullptr;
+	};
+	auto selectMain = [this, selected]() {
+		OBSSceneItem item = selected();
+		if (!item)
+			return false;
+		ui->sources->clearSelection();
+		ui->sources->SelectItem(item, true);
+		return true;
+	};
+	auto refresh = [this, list, items, details, selected, propertiesButton, up, down, remove, left, right, full]() {
+		OBSSceneItem current = selected();
+		QSignalBlocker blocker(list);
+		std::vector<OBSSceneItem> nextItems;
+		for (int row = 0; row < ui->sources->model()->rowCount(); ++row) {
+			OBSSceneItem item = ui->sources->Get(row);
+			if (!item || !obs_sceneitem_get_scene(item))
+				continue;
+			nextItems.push_back(item);
+		}
+		if (nextItems != *items) {
+			list->clear();
+			*items = std::move(nextItems);
+			for (const auto &item : *items) {
+				auto *entry = new QListWidgetItem(list);
+				if (item == current)
+					list->setCurrentItem(entry);
+			}
+		}
+		for (size_t row = 0; row < items->size(); ++row) {
+			const OBSSceneItem &item = items->at(row);
+			auto *entry = list->item(int(row));
+			entry->setText(QString::fromUtf8(obs_source_get_name(obs_sceneitem_get_source(item))));
+			entry->setFlags(entry->flags() | Qt::ItemIsUserCheckable);
+			entry->setCheckState(obs_sceneitem_visible(item) ? Qt::Checked : Qt::Unchecked);
+		}
+		current = selected();
+		obs_source_t *source = current ? obs_sceneitem_get_source(current) : nullptr;
+		const bool canPlace = current && !obs_sceneitem_locked(current) &&
+			!obs_sceneitem_get_group(GetCurrentScene(), current) &&
+			(obs_source_get_output_flags(source) & OBS_SOURCE_VIDEO);
+		for (auto *control : {left, right, full})
+			control->setEnabled(canPlace);
+		propertiesButton->setEnabled(source && obs_source_configurable(source));
+		up->setEnabled(bool(current));
+		down->setEnabled(bool(current));
+		remove->setEnabled(bool(current));
+		details->setText(source ? QStringLiteral("%1 · %2 × %3\n배치 변경은 메인 미리보기에 바로 반영됩니다.")
+			.arg(QString::fromUtf8(obs_source_get_name(source))).arg(obs_source_get_width(source)).arg(obs_source_get_height(source))
+			: QStringLiteral("소스를 선택하세요. 그룹 내부 소스는 메인 소스 목록에서 그룹을 펼치면 표시됩니다."));
+	};
+	connect(list, &QListWidget::currentRowChanged, dialog, [selectMain](int) { selectMain(); });
+	connect(list, &QListWidget::itemChanged, dialog, [this, list, items](QListWidgetItem *entry) {
+		const int row = list->row(entry);
+		if (row < 0 || size_t(row) >= items->size())
+			return;
+		OBSSceneItem item = items->at(row);
+		if (!obs_sceneitem_get_scene(item))
+			return;
+		bool belongsToCurrentList = false;
+		for (int index = 0; index < ui->sources->model()->rowCount(); ++index)
+			belongsToCurrentList |= ui->sources->Get(index) == item;
+		if (!belongsToCurrentList)
+			return;
+		OBSData before = BackupScene(GetCurrentSceneSource());
+		obs_sceneitem_set_visible(item, entry->checkState() == Qt::Checked);
+		CreateSceneUndoRedoAction(QStringLiteral("소스 표시 변경"), before, BackupScene(GetCurrentSceneSource()));
+		SaveProject();
+	});
+	connect(add, &QPushButton::clicked, dialog, [this, dialog]() {
+		dialog->hide();
+		ui->actionAddSource->trigger();
+		if (addWindow)
+			connect(addWindow, &QObject::destroyed, dialog, [dialog]() { dialog->show(); });
+		else
+			dialog->show();
+	});
+	connect(propertiesButton, &QPushButton::clicked, dialog, [this, selected]() {
+		if (OBSSceneItem item = selected())
+			CreatePropertiesWindow(obs_sceneitem_get_source(item));
+	});
+	connect(up, &QPushButton::clicked, dialog, [this, selectMain, refresh]() {
+		if (selectMain()) on_actionMoveUp_triggered();
+		refresh();
+	});
+	connect(down, &QPushButton::clicked, dialog, [this, selectMain, refresh]() {
+		if (selectMain()) on_actionMoveDown_triggered();
+		refresh();
+	});
+	connect(remove, &QPushButton::clicked, dialog, [this, selectMain, refresh]() {
+		if (selectMain()) on_actionRemoveSource_triggered();
+		refresh();
+	});
+	int preset = 0;
+	for (auto *control : {left, right, full}) {
+		connect(control, &QPushButton::clicked, dialog, [this, selected, preset]() {
+			ApplyEduToolSourceLayout(selected(), preset);
+		});
+		++preset;
+	}
+	auto *timer = new QTimer(dialog);
+	connect(timer, &QTimer::timeout, dialog, refresh);
+	timer->start(500);
+	refresh();
+	dialog->show();
+}
+
+void OBSBasic::ConfigureEduToolCameraLayout(OBSSceneItem item)
+{
+	bool accepted = false;
+	const QStringList layouts = {QStringLiteral("왼쪽 하단 PIP"), QStringLiteral("오른쪽 하단 PIP"),
+				     QStringLiteral("전체 화면")};
+	const QString choice = QInputDialog::getItem(this, QStringLiteral("카메라 배치"),
+		QStringLiteral("새 카메라를 어디에 배치할까요?\n취소하면 현재 배치를 유지합니다."), layouts, 1, false, &accepted);
+	if (accepted)
+		ApplyEduToolSourceLayout(item, layouts.indexOf(choice));
+}
+
+void OBSBasic::ApplyEduToolSourceLayout(OBSSceneItem item, int layout)
+{
+	OBSScene scene = GetCurrentScene();
+	if (!item || !scene || obs_sceneitem_locked(item) ||
+	    obs_sceneitem_get_scene(item) != scene || layout < 0 || layout > 2)
+		return;
+	obs_video_info video = {};
+	if (!obs_get_video_info(&video) || !video.base_width || !video.base_height)
+		return;
+	OBSData before = BackupScene(obs_scene_get_source(scene));
+	obs_transform_info transform = {};
+	transform.alignment = OBS_ALIGN_LEFT | OBS_ALIGN_TOP;
+	transform.bounds_alignment = OBS_ALIGN_CENTER;
+	transform.bounds_type = OBS_BOUNDS_SCALE_INNER;
+	vec2_set(&transform.scale, 1.0f, 1.0f);
+	const float width = float(video.base_width);
+	const float height = float(video.base_height);
+	const float margin = std::min(width, height) * 0.025f;
+	const float fraction = layout == 2 ? 1.0f : 0.28f;
+	vec2_set(&transform.bounds, width * fraction, height * fraction);
+	if (layout != 2)
+		vec2_set(&transform.pos, layout == 0 ? margin : width - transform.bounds.x - margin,
+			 height - transform.bounds.y - margin);
+	obs_sceneitem_crop crop = {};
+	obs_sceneitem_set_crop(item, &crop);
+	obs_sceneitem_set_info2(item, &transform);
+	CreateSceneUndoRedoAction(QStringLiteral("소스 배치 변경"), before, BackupScene(obs_scene_get_source(scene)));
+	SaveProject();
 }
 
 static bool remove_items(obs_scene_t *, obs_sceneitem_t *item, void *param)

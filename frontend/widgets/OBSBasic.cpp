@@ -459,6 +459,8 @@ OBSBasic::OBSBasic(QWidget *parent) : OBSMainWindow(parent), undo_s(ui), ui(new 
 	previewBar->setFloatable(false);
 	auto *previewFullscreenAction = previewBar->addAction(QStringLiteral("미리보기 전체화면"));
 	auto *compositionAction = previewBar->addAction(QStringLiteral("구도 조정"));
+	auto *sourceManagerAction = previewBar->addAction(QStringLiteral("소스 관리"));
+	connect(sourceManagerAction, &QAction::triggered, this, &OBSBasic::OpenEduToolSourceManager);
 	compositionAction->setEnabled(ui->actionEditTransform->isEnabled());
 	connect(ui->actionEditTransform, &QAction::changed, this, [this, compositionAction]() {
 		compositionAction->setEnabled(ui->actionEditTransform->isEnabled());

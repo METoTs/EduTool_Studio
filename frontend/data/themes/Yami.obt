@@ -2905,3 +2905,35 @@ QLabel#eduToolFeatureSummary {
     color: #c9daec;
     font-size: 16px;
 }
+
+QDialog#eduToolSourceManager {
+    background: #09203a;
+}
+
+QLabel#eduToolSourceHeading {
+    color: #e7f1ff;
+    font-size: 24px;
+    font-weight: 700;
+}
+
+QListWidget#eduToolSourceList {
+    background: #06192d;
+    border: 1px solid #184c79;
+    border-radius: 6px;
+    padding: 8px;
+}
+
+QListWidget#eduToolSourceList::item {
+    padding: 12px;
+    min-height: 26px;
+}
+
+QListWidget#eduToolSourceList::item:selected {
+    background: #1266cf;
+    color: white;
+}
+
+QDialog#eduToolSourceManager QPushButton {
+    padding: 10px 14px;
+    border-radius: 6px;
+}

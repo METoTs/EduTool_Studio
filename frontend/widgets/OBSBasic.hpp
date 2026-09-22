@@ -626,6 +626,7 @@ private slots:
 	void OpenSettingsPage(int page);
 	void ShowEduToolError(const QString &message, int settingsPage);
 	void ClearEduToolError();
+	void OpenEduToolSourceManager();
 	void on_actionShowMacPermissions_triggered();
 	void on_actionShowLogs_triggered();
 	void on_actionUploadCurrentLog_triggered();
@@ -673,6 +674,8 @@ public:
 	void CreateFiltersWindow(obs_source_t *source);
 	void CreateEditTransformWindow(obs_sceneitem_t *item);
 	void CreatePropertiesWindow(obs_source_t *source);
+	void ConfigureEduToolCameraLayout(OBSSceneItem item);
+	void ApplyEduToolSourceLayout(OBSSceneItem item, int layout);
 
 	void UploadLog(const char *subdir, const char *file, OBS::LogFileType uploadType);
 

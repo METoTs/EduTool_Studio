@@ -812,6 +812,9 @@ void OBSBasicSourceSelect::createNew()
 	undo_s.add_action(QTStr("Undo.Add").arg(QString::fromStdString(newName)), undo, redo,
 			  std::string(obs_source_get_uuid(newSource)), std::string(obs_data_get_json(wrapper)));
 
+	if (strcmp(obs_source_get_unversioned_id(newSource), "dshow_input") == 0) {
+		main->ConfigureEduToolCameraLayout(item);
+	}
 	main->CreatePropertiesWindow(newSource);
 
 	close();
