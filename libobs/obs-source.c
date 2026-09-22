@@ -216,6 +216,7 @@ extern char *find_libobs_data_file(const char *file);
 static bool obs_source_init(struct obs_source *source)
 {
 	source->user_volume = 1.0f;
+	source->monitoring_volume = -1.0f;
 	source->volume = 1.0f;
 	source->sync_offset = 0;
 	source->balance = 0.5f;
@@ -701,6 +702,7 @@ obs_source_t *obs_source_duplicate(obs_source_t *source, const char *new_name, b
 	new_source->audio_mixers = source->audio_mixers;
 	new_source->sync_offset = source->sync_offset;
 	new_source->user_volume = source->user_volume;
+	new_source->monitoring_volume = source->monitoring_volume;
 	new_source->user_muted = source->user_muted;
 	new_source->volume = source->volume;
 	new_source->muted = source->muted;
@@ -4578,6 +4580,18 @@ void obs_source_set_volume(obs_source_t *source, float volume)
 float obs_source_get_volume(const obs_source_t *source)
 {
 	return obs_source_valid(source, "obs_source_get_volume") ? source->user_volume : 0.0f;
+}
+
+void obs_source_set_monitoring_volume(obs_source_t *source, float volume)
+{
+	if (!obs_source_valid(source, "obs_source_set_monitoring_volume") || !isfinite(volume))
+		return;
+	source->monitoring_volume = volume < 0.0f ? -1.0f : fminf(volume, 4.0f);
+}
+
+float obs_source_get_monitoring_volume(const obs_source_t *source)
+{
+	return obs_source_valid(source, "obs_source_get_monitoring_volume") ? source->monitoring_volume : -1.0f;
 }
 
 void obs_source_set_sync_offset(obs_source_t *source, int64_t offset)

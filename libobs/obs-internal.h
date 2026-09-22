@@ -883,6 +883,7 @@ struct obs_source {
 	size_t audio_storage_size;
 	uint32_t audio_mixers;
 	float user_volume;
+	float monitoring_volume; /* -1 keeps the traditional output-volume behavior. */
 	float volume;
 	int64_t sync_offset;
 	int64_t last_sync_offset;

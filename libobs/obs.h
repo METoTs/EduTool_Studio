@@ -1193,6 +1193,10 @@ EXPORT void obs_source_set_volume(obs_source_t *source, float volume);
 /** Gets the user volume for a source that has audio output */
 EXPORT float obs_source_get_volume(const obs_source_t *source);
 
+/** Independent monitoring gain; -1 follows source output volume. */
+EXPORT void obs_source_set_monitoring_volume(obs_source_t *source, float volume);
+EXPORT float obs_source_get_monitoring_volume(const obs_source_t *source);
+
 /* Gets speaker layout of a source */
 EXPORT enum speaker_layout obs_source_get_speaker_layout(obs_source_t *source);
 

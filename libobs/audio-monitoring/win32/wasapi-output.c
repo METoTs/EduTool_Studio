@@ -282,7 +282,7 @@ static void on_audio_playback(void *param, obs_source_t *source, const struct au
 
 	struct audio_monitor *monitor = param;
 	uint8_t *resample_data[MAX_AV_PLANES];
-	float vol = source->user_volume;
+	float vol = source->monitoring_volume < 0.0f ? source->user_volume : source->monitoring_volume;
 	uint32_t resample_frames;
 	uint64_t ts_offset;
 	bool success;
