@@ -57,6 +57,9 @@
 #include <qt-wrappers.hpp>
 
 #include <QActionGroup>
+#include <QComboBox>
+#include <QDialog>
+#include <QSignalBlocker>
 #include <QLabel>
 #include <QPushButton>
 #include <QStackedWidget>
@@ -82,8 +85,10 @@
 
 using namespace std;
 
-static QString EduToolDeviceState(obs_source_t *source, const char *deviceProperty)
+static QString EduToolDeviceState(obs_source_t *source, const char *deviceProperty, QString *deviceName = nullptr)
 {
+	if (deviceName)
+		deviceName->clear();
 	if (!source) {
 		return QStringLiteral("미설정");
 	}
@@ -103,6 +108,8 @@ static QString EduToolDeviceState(obs_source_t *source, const char *deviceProper
 			const char *candidate = obs_property_list_item_string(devices, i);
 			if (candidate && strcmp(selected, candidate) == 0) {
 				found = true;
+				if (deviceName)
+					*deviceName = QString::fromUtf8(obs_property_list_item_name(devices, i));
 				break;
 			}
 		}
@@ -482,6 +489,9 @@ OBSBasic::OBSBasic(QWidget *parent) : OBSMainWindow(parent), undo_s(ui), ui(new 
 		statusLayout->addWidget(label);
 	}
 	statusLayout->addStretch();
+	auto *cameraSettings = new QPushButton(QStringLiteral("카메라 세부 설정"), statusContent);
+	statusLayout->addWidget(cameraSettings);
+	connect(cameraSettings, &QPushButton::clicked, this, &OBSBasic::OpenEduToolCameraSettings);
 	statusDock->setWidget(statusContent);
 	addDockWidget(Qt::RightDockWidgetArea, statusDock);
 	statusDock->toggleViewAction()->setText(QStringLiteral("상태 패널"));
@@ -1684,6 +1694,131 @@ void OBSBasic::OnFirstLoad()
 }
 
 OBSBasic::~OBSBasic() {}
+
+void OBSBasic::OpenEduToolCameraSettings()
+{
+	if (auto *existing = findChild<QDialog *>(QStringLiteral("eduToolCameraSettings"))) {
+		existing->show();
+		existing->raise();
+		existing->activateWindow();
+		return;
+	}
+	auto *dialog = new QDialog(this);
+	dialog->setObjectName(QStringLiteral("eduToolCameraSettings"));
+	dialog->setWindowTitle(QStringLiteral("카메라 설정"));
+	dialog->setAttribute(Qt::WA_DeleteOnClose);
+	dialog->resize(600, 390);
+	auto *layout = new QVBoxLayout(dialog);
+	layout->setContentsMargins(24, 24, 24, 24);
+	layout->setSpacing(16);
+	auto *heading = new QLabel(QStringLiteral("카메라 설정"), dialog);
+	heading->setObjectName(QStringLiteral("eduToolCameraHeading"));
+	layout->addWidget(heading);
+	auto *hint = new QLabel(QStringLiteral("설정할 카메라 소스를 선택하세요.\n장치·해상도·FPS는 장치 설정 창에서 변경합니다."), dialog);
+	hint->setWordWrap(true);
+	layout->addWidget(hint);
+	auto *cameras = new QComboBox(dialog);
+	cameras->setAccessibleName(QStringLiteral("설정할 카메라 소스"));
+	layout->addWidget(cameras);
+	auto *status = new QLabel(dialog);
+	status->setTextFormat(Qt::PlainText);
+	status->setWordWrap(true);
+	layout->addWidget(status);
+	auto *details = new QLabel(dialog);
+	details->setTextFormat(Qt::PlainText);
+	details->setWordWrap(true);
+	layout->addWidget(details);
+	auto *open = new QPushButton(QStringLiteral("장치·해상도·FPS 설정 열기"), dialog);
+	layout->addWidget(open);
+	auto *driverHint = new QLabel(QStringLiteral("장치 설정 창의 ‘비디오 설정’에서 카메라 드라이버의 세부 속성을 엽니다.\n"
+						   "지원하는 항목은 카메라에 따라 다릅니다. 녹화 출력 해상도·FPS는 별도입니다."), dialog);
+	driverHint->setWordWrap(true);
+	layout->addWidget(driverHint);
+	auto *actions = new QHBoxLayout;
+	layout->addLayout(actions);
+	auto *refreshButton = new QPushButton(QStringLiteral("장치 다시 검색"), dialog);
+	auto *reconnect = new QPushButton(QStringLiteral("선택 카메라 다시 연결"), dialog);
+	auto *add = new QPushButton(QStringLiteral("소스 관리"), dialog);
+	for (auto *button : {refreshButton, reconnect, add})
+		actions->addWidget(button);
+	auto *close = new QPushButton(QStringLiteral("닫기"), dialog);
+	layout->addWidget(close, 0, Qt::AlignRight);
+	connect(close, &QPushButton::clicked, dialog, &QDialog::close);
+	auto selected = [cameras]() -> OBSSource {
+		const QByteArray uuid = cameras->currentData().toString().toUtf8();
+		OBSSourceAutoRelease source = obs_get_source_by_uuid(uuid.constData());
+		if (!source || obs_source_removed(source) ||
+		    strcmp(obs_source_get_unversioned_id(source), "dshow_input") != 0)
+			return nullptr;
+		return OBSSource(source);
+	};
+	auto updateDetails = [selected, status, details, open, reconnect]() {
+		OBSSource source = selected();
+		open->setEnabled(bool(source));
+		reconnect->setEnabled(false);
+		if (!source) {
+			status->setText(QStringLiteral("등록된 카메라가 없습니다. 소스 관리에서 카메라를 추가하세요."));
+			details->clear();
+			return;
+		}
+		OBSDataAutoRelease settings = obs_source_get_settings(source);
+		QString deviceName;
+		const QString connection = EduToolDeviceState(source, "video_device_id", &deviceName);
+		const bool active = obs_data_get_bool(settings, "active");
+		status->setText(QStringLiteral("장치 검색: %1 · 캡처 설정: %2")
+			.arg(connection, active ? QStringLiteral("활성") : QStringLiteral("비활성")));
+		status->setToolTip(QStringLiteral("장치 목록에서 검색되는 상태입니다. 실제 영상 수신 여부는 장치 설정 창의 미리보기에서 확인하세요."));
+		reconnect->setEnabled(active && connection == QStringLiteral("연결됨"));
+		const auto interval = obs_data_get_int(settings, "frame_interval");
+		const bool custom = obs_data_get_int(settings, "res_type") != 0;
+		QString resolution = QString::fromUtf8(obs_data_get_string(settings, "resolution"));
+		if (!custom || resolution.isEmpty())
+			resolution = QStringLiteral("장치 기본값");
+		const QString fps = !custom ? QStringLiteral("장치 기본 FPS")
+			: interval > 0 ? QStringLiteral("%1 FPS").arg(10000000.0 / double(interval), 0, 'f', 2)
+			: interval == 0 ? QStringLiteral("장치 최대 FPS") : QStringLiteral("출력 FPS에 맞춤");
+		details->setText(QStringLiteral("장치: %1\n입력 설정: %2 · %3\n연결이 끊겼다면 장치를 다시 연결하고 ‘장치 다시 검색’을 누르세요.")
+			.arg(deviceName.isEmpty() ? QStringLiteral("선택 장치를 찾을 수 없음") : deviceName, resolution, fps));
+	};
+	auto refresh = [cameras, updateDetails]() {
+		const QString previous = cameras->currentData().toString();
+		QSignalBlocker blocker(cameras);
+		cameras->clear();
+		obs_enum_sources([](void *data, obs_source_t *source) {
+			if (strcmp(obs_source_get_unversioned_id(source), "dshow_input") == 0 && !obs_source_removed(source)) {
+				auto *combo = static_cast<QComboBox *>(data);
+				combo->addItem(QString::fromUtf8(obs_source_get_name(source)),
+					       QString::fromUtf8(obs_source_get_uuid(source)));
+			}
+			return true;
+		}, cameras);
+		const int index = cameras->findData(previous);
+		if (index >= 0)
+			cameras->setCurrentIndex(index);
+		updateDetails();
+	};
+	connect(cameras, &QComboBox::currentIndexChanged, dialog, [updateDetails](int) { updateDetails(); });
+	connect(refreshButton, &QPushButton::clicked, dialog, refresh);
+	connect(open, &QPushButton::clicked, dialog, [this, selected]() {
+		if (OBSSource source = selected())
+			CreatePropertiesWindow(source);
+	});
+	connect(reconnect, &QPushButton::clicked, dialog, [selected, status]() {
+		if (OBSSource source = selected()) {
+			obs_source_update(source, nullptr);
+			status->setText(QStringLiteral("재연결을 요청했습니다. 장치 설정 창의 미리보기에서 영상을 확인하세요."));
+		}
+	});
+	connect(add, &QPushButton::clicked, dialog, [this]() { OpenEduToolSourceManager(); });
+	auto *timer = new QTimer(dialog);
+	connect(timer, &QTimer::timeout, dialog, [cameras, refresh]() {
+		if (!cameras->view()->isVisible())
+			refresh();
+	});
+	timer->start(3000);
+	refresh();
+	dialog->show();
+}
 
 void OBSBasic::ShowEduToolError(const QString &message, int settingsPage)
 {

@@ -627,6 +627,7 @@ private slots:
 	void ShowEduToolError(const QString &message, int settingsPage);
 	void ClearEduToolError();
 	void OpenEduToolSourceManager();
+	void OpenEduToolCameraSettings();
 	void on_actionShowMacPermissions_triggered();
 	void on_actionShowLogs_triggered();
 	void on_actionUploadCurrentLog_triggered();
