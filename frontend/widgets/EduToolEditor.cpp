@@ -43,6 +43,24 @@
 #include <cmath>
 #include <functional>
 
+class EduToolTimeSpinBox : public QDoubleSpinBox {
+public:
+	using QDoubleSpinBox::QDoubleSpinBox;
+	std::function<void(const QString &)> invalidTime;
+protected:
+	QValidator::State validate(QString &text, int &position) const override
+	{
+		QString number = text;
+		if (number.endsWith(suffix())) number.chop(suffix().size());
+		bool ok = false;
+		const double value = locale().toDouble(number.trimmed(), &ok);
+		if (ok && (value < minimum() || value > maximum()) && invalidTime)
+			invalidTime(QStringLiteral("선택 범위 오류: 0 ~ %1 초 사이의 시간을 입력하세요. 초과 입력은 적용되지 않았습니다.")
+				.arg(maximum(), 0, 'f', decimals()));
+		return QDoubleSpinBox::validate(text, position);
+	}
+};
+
 static QString stamp(qint64 ms)
 {
 	return QStringLiteral("%1:%2:%3.%4").arg(ms / 3600000, 2, 10, QChar('0'))
@@ -202,11 +220,16 @@ EduToolEditor::EduToolEditor(QWidget *parent) : QWidget(parent)
 	timeline->selection = [this](qint64 a, qint64 b) { start->setValue(a / 1000.0); end->setValue(b / 1000.0); };
 	auto *selectionRow = new QHBoxLayout; layout->addLayout(selectionRow);
 	auto *edits = selectionRow;
-	start = new QDoubleSpinBox(this); end = new QDoubleSpinBox(this);
+	start = new EduToolTimeSpinBox(this); end = new EduToolTimeSpinBox(this);
 	for (auto *spin : {start, end}) { spin->setDecimals(3); spin->setSuffix(QStringLiteral(" 초")); edits->addWidget(spin); }
 	start->setAccessibleName(QStringLiteral("선택 시작")); end->setAccessibleName(QStringLiteral("선택 끝"));
 	auto *selectionLength = new QLabel(QStringLiteral("선택 길이: 0.000 초"), this);
 	selectionLength->setAccessibleName(QStringLiteral("선택 구간 길이"));
+	selectionLength->setWordWrap(true);
+	for (auto *spin : {start, end})
+		static_cast<EduToolTimeSpinBox *>(spin)->invalidTime = [selectionLength](const QString &message) {
+			selectionLength->setText(message);
+		};
 	layout->addWidget(selectionLength);
 	for (auto *spin : {start, end}) connect(spin, &QDoubleSpinBox::valueChanged, this, [this, selectionLength](double) {
 		timeline->from = qint64(start->value() * 1000); timeline->to = qint64(end->value() * 1000); timeline->update();

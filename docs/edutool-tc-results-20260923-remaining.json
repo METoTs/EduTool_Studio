@@ -4,8 +4,8 @@
   "baseline": "docs/edutool-tc-results-20260923-after-recheck.json",
   "scope": "Computer Use 실제 실행 재검증. 누적 판정이며 전체97건을 이번에 재실행한 것은 아님.",
   "counts": {
-    "통과": 42,
-    "부분 확인": 20,
+    "통과": 44,
+    "부분 확인": 18,
     "기존 통과": 4,
     "차단": 31
   },
@@ -44,19 +44,19 @@
       "id": "TC-003",
       "procedure": "창 최소 크기와 일반 크기에서 주요 화면 확인",
       "expected": "주요 실행 버튼, 상태, 미리보기에 겹침·잘림이 없고 필요한 영역은 스크롤 가능하다.",
-      "status": "부분 확인",
-      "result": "843px 폭 및 편집522px 높이에서 스크롤 접근 확인. 더 줄인726px 폭에서 편집 가로 스크롤은 있으나 상단 계정 버튼이 보이지 않아 좁은 창 상단 접근을 추가 보완해야 함.",
+      "status": "통과",
+      "result": "좁은 창에서 브랜드 축약·버튼 여백 조정. 최소726px에서 녹화/라이브 주요 버튼과 추가 메뉴의 계정 항목 접근 확인. 편집 메타데이터·가로/세로 스크롤, 업로드 하단 옵션 접근 확인. 일반/최대화 결과와 합산.",
       "evidence": [
         "tc-screenshots/fixes-20260923/45-final-start-layout.png",
         "tc-screenshots/fixes-20260923/53-recording-loaded.png",
         "tc-screenshots/fixes-20260923/61-layout-after-play.png",
-        "tc-screenshots/remaining-tc-20260923/05-min-height.png",
-        "tc-screenshots/remaining-tc-20260923/07-min-edit-scroll.png",
-        "tc-screenshots/remaining-tc-20260923/08-small-record.png",
-        "tc-screenshots/remaining-tc-20260923/09-small-live.png",
-        "tc-screenshots/remaining-tc-20260923/11-small-upload-bottom.png",
-        "tc-screenshots/remaining-tc-20260923/19-min-loaded.png",
-        "tc-screenshots/remaining-tc-20260923/20-min-scroll.png"
+        "tc-screenshots/remaining-tc-20260923/40-min-header.png",
+        "tc-screenshots/remaining-tc-20260923/43-min-record-all-buttons.png",
+        "tc-screenshots/remaining-tc-20260923/44-min-overflow-account.png",
+        "tc-screenshots/remaining-tc-20260923/45-min-live-fixed.png",
+        "tc-screenshots/remaining-tc-20260923/47-min-upload-scroll.png",
+        "tc-screenshots/remaining-tc-20260923/48-min-loaded-fixed.png",
+        "tc-screenshots/remaining-tc-20260923/49-min-edit-scroll-fixed.png"
       ],
       "previousStatus": "부분 확인",
       "verificationRun": "remaining-tc-20260923"
@@ -1017,18 +1017,20 @@
       "id": "TC-512",
       "procedure": "시작/끝 시간을 직접 입력",
       "expected": "유효한 값만 적용되며 시작이 끝보다 늦거나 길이를 넘으면 오류를 표시한다.",
-      "status": "부분 확인",
-      "result": "끝0.500<시작0.992에서 범위 오류 안내 및 재생 차단. 8초 영상에99초 입력은 반영되지 않아 기존0.500 유지, 정확한8.000초는 허용. 다만 초과값이 거부될 때 별도 오류 안내는 관찰되지 않아 기대조건 전체 통과로 판정하지 않음.",
+      "status": "통과",
+      "result": "8초 영상에99초 입력 시 기존값0 유지 및 허용범위/미적용 안내 표시. 이어8초 입력은 정상 적용되고 선택 길이8초 표시. 이전 역전 범위 오류·재생 차단 증거와 합산.",
       "evidence": [
         "tc-screenshots/full-tc-20260923/TC-512-reversed.png",
         "tc-screenshots/full-tc-20260923/TC-512-error.png",
         "tc-screenshots/recheck-20260923/07-invalid-range.png",
         "tc-screenshots/recheck-20260923/08-invalid-play.png",
         "tc-screenshots/recheck-20260923/09-beyond-duration.png",
-        "tc-screenshots/recheck-20260923/10-exact-duration.png"
+        "tc-screenshots/recheck-20260923/10-exact-duration.png",
+        "tc-screenshots/remaining-tc-20260923/50-range-overflow-feedback.png",
+        "tc-screenshots/remaining-tc-20260923/51-exact-end-accepted.png"
       ],
       "previousStatus": "부분 확인",
-      "verificationRun": "recheck-20260923"
+      "verificationRun": "remaining-tc-20260923"
     },
     {
       "id": "TC-513",
@@ -1411,11 +1413,11 @@
   ],
   "metrics": {
     "total": 97,
-    "passed": 46,
+    "passed": 48,
     "excluded": 37,
     "eligible": 60,
-    "allRate": 47.4,
-    "eligibleRate": 76.7
+    "allRate": 49.5,
+    "eligibleRate": 80
   },
   "improvements": {
     "IMP-01": {

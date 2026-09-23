@@ -293,6 +293,24 @@ static void SetCoreModuleNames()
 
 extern void setupDockAction(QDockWidget *dock);
 
+class EduToolFeatureBar : public QToolBar {
+public:
+	using QToolBar::QToolBar;
+	QLabel *brand = nullptr;
+protected:
+	void resizeEvent(QResizeEvent *event) override
+	{
+		const bool compact = width() < 940;
+		if (property("compact").toBool() != compact) {
+			setProperty("compact", compact);
+			setStyleSheet(compact ? QStringLiteral("QToolBar#eduToolFeatureBar QToolButton { padding: 9px 8px; }") : QString());
+		}
+		if (brand)
+			brand->setText(compact ? QStringLiteral("Et") : QStringLiteral("Et  EduTool Studio"));
+		QToolBar::resizeEvent(event);
+	}
+};
+
 OBSBasic::OBSBasic(QWidget *parent) : OBSMainWindow(parent), undo_s(ui), ui(new Ui::OBSBasic)
 {
 	collections = {};
@@ -441,11 +459,13 @@ OBSBasic::OBSBasic(QWidget *parent) : OBSMainWindow(parent), undo_s(ui), ui(new 
 	connect(editor, &EduToolEditor::exportReady, portal, &EduToolPortal::offerFile);
 	setCentralWidget(featurePages);
 
-	auto *featureBar = new QToolBar(QStringLiteral("EduTool 기능"), this);
+	auto *featureBar = new EduToolFeatureBar(QStringLiteral("EduTool 기능"), this);
 	featureBar->setObjectName(QStringLiteral("eduToolFeatureBar"));
 	featureBar->setMovable(false);
 	featureBar->setFloatable(false);
 	auto *brand = new QLabel(QStringLiteral("Et  EduTool Studio"), featureBar);
+	featureBar->brand = brand;
+	brand->setToolTip(QStringLiteral("EduTool Studio"));
 	brand->setObjectName(QStringLiteral("eduToolBrand"));
 	featureBar->addWidget(brand);
 	featureBar->addSeparator();
