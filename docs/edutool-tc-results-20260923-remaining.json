@@ -4,8 +4,8 @@
   "baseline": "docs/edutool-tc-results-20260923-after-recheck.json",
   "scope": "Computer Use 실제 실행 재검증. 누적 판정이며 전체97건을 이번에 재실행한 것은 아님.",
   "counts": {
-    "통과": 44,
-    "부분 확인": 18,
+    "통과": 46,
+    "부분 확인": 16,
     "기존 통과": 4,
     "차단": 31
   },
@@ -1052,14 +1052,17 @@
       "id": "TC-514",
       "procedure": "선택 구간 삭제",
       "expected": "선택 부분이 결과에서 빠지고 전체 길이·경계·프리뷰가 갱신된다.",
-      "status": "부분 확인",
-      "result": "1~2초 삭제 후 73.4→72.4초, 3→4개 클립과 경계 갱신. 결과 내보내기 72.429667초/정상 디코드. 앱 프리뷰의 경계 재생은 미확인.",
+      "status": "통과",
+      "result": "0.992~2.008초 삭제 후 총8→6.984초 및 두 조각 경계 확인. 경계 프리뷰는 원본2.042초, 실제 재생 시 편집5.600초에 원본6.625초 표시(삭제 길이1.016초 반영). 이전 결과 파일 디코드 증거와 합산.",
       "evidence": [
         "tc-screenshots/full-tc-20260923/TC-514-cut.png",
-        "tc-screenshots/full-tc-20260923/export-probe.json"
+        "tc-screenshots/full-tc-20260923/export-probe.json",
+        "tc-screenshots/remaining-tc-20260923/52-delete-selection.png",
+        "tc-screenshots/remaining-tc-20260923/54-delete-boundary-preview.png",
+        "tc-screenshots/remaining-tc-20260923/55-delete-boundary-playing.png"
       ],
       "previousStatus": "부분 확인",
-      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+      "verificationRun": "remaining-tc-20260923"
     },
     {
       "id": "TC-515",
@@ -1130,14 +1133,17 @@
       "id": "TC-520",
       "procedure": "복수 영상을 추가해 앞/현재 위치/뒤에 각각 삽입",
       "expected": "타임라인의 순서·총 길이·재생 결과가 선택한 위치와 일치한다.",
-      "status": "부분 확인",
-      "result": "3초 AVI 맨 앞 삽입으로 8→11초 및 앞 순서 확인. 이전 뒤 추가는 73.4초 확인. 현재 위치 삽입은 미검증이며 경계 재생 실패(TC-521).",
+      "status": "통과",
+      "result": "현재4.005초에3초 파란 영상 삽입: 원본0~4.005 / 파란0~3 / 원본4.005~8 순서와 총11초 확인. 삽입 프리뷰 및 이후 원본 마지막 프레임까지 재생. 이전 맨 앞·뒤 삽입 증거와 합산.",
       "evidence": [
         "tc-screenshots/full-tc-20260923/TC-520-front.png",
-        "tc-screenshots/full-tc-20260923/TC-521-stalled.png"
+        "tc-screenshots/full-tc-20260923/TC-521-stalled.png",
+        "tc-screenshots/remaining-tc-20260923/56-current-insert.png",
+        "tc-screenshots/remaining-tc-20260923/57-insert-boundary-playing.png",
+        "tc-screenshots/remaining-tc-20260923/58-insert-project-saved.png"
       ],
       "previousStatus": "부분 확인",
-      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+      "verificationRun": "remaining-tc-20260923"
     },
     {
       "id": "TC-521",
@@ -1413,11 +1419,11 @@
   ],
   "metrics": {
     "total": 97,
-    "passed": 48,
+    "passed": 50,
     "excluded": 37,
     "eligible": 60,
-    "allRate": 49.5,
-    "eligibleRate": 80
+    "allRate": 51.5,
+    "eligibleRate": 83.3
   },
   "improvements": {
     "IMP-01": {
