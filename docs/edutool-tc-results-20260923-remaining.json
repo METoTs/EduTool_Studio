@@ -4,8 +4,8 @@
   "baseline": "docs/edutool-tc-results-20260923-after-recheck.json",
   "scope": "Computer Use 실제 실행 재검증. 누적 판정이며 전체97건을 이번에 재실행한 것은 아님.",
   "counts": {
-    "통과": 46,
-    "부분 확인": 16,
+    "통과": 47,
+    "부분 확인": 15,
     "기존 통과": 4,
     "차단": 31
   },
@@ -1244,14 +1244,18 @@
       "id": "TC-528",
       "procedure": "내보내기 중 취소/오류",
       "expected": "부분 파일 처리 상태를 알리고 저장된 편집 작업을 유지한다.",
-      "status": "부분 확인",
-      "result": "10분 영상 내보내기 중 작업 취소: 취소 안내 및 600초 편집·307.161초 위치 유지. 최종 cancel-export.mp4가 남지 않음. 강제 인코더 오류 분기는 미검증.",
+      "status": "통과",
+      "result": "중간 입력 파일 누락으로 인코더 오류 재현. 실패 후 3개 클립·선택 구간 유지, 버튼 복구, 최종/임시 파일 미잔존 및 프로젝트 SHA256 동일 확인. 임시 파일 정리 결과·재시도 안내 보완 후 재실행 확인. 기존 취소 검증과 결합.",
       "evidence": [
         "tc-screenshots/full-tc-20260923/TC-528-exporting.png",
-        "tc-screenshots/full-tc-20260923/TC-528-cancelled.png"
+        "tc-screenshots/full-tc-20260923/TC-528-cancelled.png",
+        "tc-screenshots/remaining-tc-20260923/60-encoder-failure.png",
+        "tc-screenshots/remaining-tc-20260923/61-encoder-error-recovery.png",
+        "tc-screenshots/remaining-tc-20260923/encoder-error-files.json",
+        "tc-screenshots/remaining-tc-20260923/project-before-error.json"
       ],
       "previousStatus": "부분 확인",
-      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+      "verificationRun": "remaining-tc-20260923"
     },
     {
       "id": "TC-529",
@@ -1419,11 +1423,11 @@
   ],
   "metrics": {
     "total": 97,
-    "passed": 50,
+    "passed": 51,
     "excluded": 37,
     "eligible": 60,
-    "allRate": 51.5,
-    "eligibleRate": 83.3
+    "allRate": 52.6,
+    "eligibleRate": 85
   },
   "improvements": {
     "IMP-01": {

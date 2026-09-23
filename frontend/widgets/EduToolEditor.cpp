@@ -654,6 +654,11 @@ void EduToolEditor::renderNext()
 }
 void EduToolEditor::finishExport(bool success, const QString &message)
 {
-	exporting = false; temporary.reset(); setBusy(false); status->setText(message);
+	const QString temporaryPath = temporary ? temporary->path() : QString();
+	const bool cleaned = !temporary || temporary->remove();
+	exporting = false; temporary.reset(); setBusy(false);
+	const QString cleanup = cleaned ? QStringLiteral("임시 결과를 정리했습니다.")
+		: QStringLiteral("임시 결과를 정리하지 못했습니다: %1").arg(temporaryPath);
+	status->setText(success ? message : message + QStringLiteral("\n%1 편집 작업은 유지됩니다. 원본 파일과 저장 폴더를 확인한 뒤 다시 내보내세요.").arg(cleanup));
 	if (success) { completedExportPath = exportPath; emit exportReady(completedExportPath); }
 }
