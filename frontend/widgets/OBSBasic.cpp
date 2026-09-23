@@ -126,6 +126,16 @@ static QString EduToolDeviceState(obs_source_t *source, const char *deviceProper
 	}
 	const bool hasDeviceList = devices != nullptr;
 	obs_properties_destroy(properties);
+	if (found && strcmp(deviceProperty, "device_id") == 0) {
+		calldata_t state = {};
+		const bool available = proc_handler_call(obs_source_get_proc_handler(source), "edutool_capture_state", &state);
+		const auto captureState = calldata_int(&state, "state");
+		calldata_free(&state);
+		if (available)
+			return captureState == 1 ? QStringLiteral("연결됨")
+				: captureState == 2 ? QStringLiteral("초기화 실패 · 재연결 중") : QStringLiteral("입력 준비 중");
+		return QStringLiteral("장치 감지 · 입력 상태 미확인");
+	}
 	return !hasDeviceList ? QStringLiteral("확인 불가")
 			: found ? QStringLiteral("연결됨") : QStringLiteral("연결 끊김");
 }
@@ -630,16 +640,19 @@ OBSBasic::OBSBasic(QWidget *parent) : OBSMainWindow(parent), undo_s(ui), ui(new 
 		auto audioState = [](uint32_t first, uint32_t last) {
 			int configured = 0;
 			int connected = 0;
+			QStringList problems;
 			for (uint32_t channel = first; channel <= last; ++channel) {
 				OBSSourceAutoRelease source = obs_get_output_source(channel);
 				if (source) {
 					++configured;
-					connected += EduToolDeviceState(source, "device_id") == QStringLiteral("연결됨");
+					const QString state = EduToolDeviceState(source, "device_id");
+					connected += state == QStringLiteral("연결됨");
+					if (state != QStringLiteral("연결됨") && !problems.contains(state)) problems << state;
 				}
 			}
 			return !configured ? QStringLiteral("미설정")
 				 : connected == configured ? QStringLiteral("연결됨")
-				 : connected ? QStringLiteral("일부 연결 끊김") : QStringLiteral("연결 끊김");
+				 : (connected ? QStringLiteral("일부 장치: ") : QString()) + problems.join(QStringLiteral(" / "));
 		};
 		const QString cameraText = !camera.configured ? QStringLiteral("미설정")
 					 : camera.connected == camera.configured ? QStringLiteral("연결됨")
@@ -647,7 +660,7 @@ OBSBasic::OBSBasic(QWidget *parent) : OBSMainWindow(parent), undo_s(ui), ui(new 
 							    : QStringLiteral("연결 끊김");
 		sourceStatus->setText(QStringLiteral("카메라: %1  ·  마이크: %2  ·  PC 소리: %3")
 					      .arg(cameraText, audioState(3, 6), audioState(1, 2)));
-		sourceStatus->setToolTip(QStringLiteral("OBS에서 선택한 장치가 현재 장치 목록에 있는지 확인합니다."));
+		sourceStatus->setToolTip(QStringLiteral("카메라는 장치 목록, Windows 오디오는 장치 목록과 캡처 초기화 상태를 확인합니다. 음성 입력과 청음은 레벨 미터 및 녹화 결과로 확인하세요."));
 		panelSourceStatus->setText(QStringLiteral("카메라: %1\n\n마이크: %2\n\nPC 소리: %3")
 						  .arg(cameraText, audioState(3, 6), audioState(1, 2)));
 	};
@@ -1866,6 +1879,10 @@ void OBSBasic::OpenEduToolAudioSettings()
 				return current && !obs_source_removed(current) ? OBSSource(current) : OBSSource();
 			};
 			auto *monitorVolume = new QSpinBox(group);
+			auto *monitorState = new QLabel(group);
+			monitorState->setWordWrap(true);
+			row->addWidget(monitorState);
+			monitorVolume->setKeyboardTracking(false);
 			monitorVolume->setRange(-1, 400);
 			monitorVolume->setSuffix(QStringLiteral(" % · 모니터링 음량"));
 			monitorVolume->setSpecialValueText(QStringLiteral("모니터링: 출력 볼륨 따라가기"));
@@ -1875,6 +1892,7 @@ void OBSBasic::OpenEduToolAudioSettings()
 				if (OBSSource current = resolve()) { obs_source_set_monitoring_volume(current, value < 0 ? -1.0f : value / 100.0f); SaveProject(); }
 			});
 			auto *inputGain = new QSpinBox(group);
+			inputGain->setKeyboardTracking(false);
 			inputGain->setRange(-30, 30); inputGain->setSuffix(QStringLiteral(" dB · 입력 게인"));
 			inputGain->setAccessibleName(QStringLiteral("입력 게인")); row->addWidget(inputGain);
 			auto findGain = [](obs_source_t *current) -> OBSSource {
@@ -1899,13 +1917,16 @@ void OBSBasic::OpenEduToolAudioSettings()
 				obs_source_set_enabled(gain, true); SaveProject();
 			});
 			auto *volumeSync = new QTimer(group);
-			auto syncVolumes = [resolve, findGain, inputGain, monitorVolume]() {
+			auto syncVolumes = [resolve, findGain, inputGain, monitorVolume, monitorState]() {
 				OBSSource current = resolve(); if (!current) return;
 				QSignalBlocker a(inputGain), b(monitorVolume);
+				monitorState->setText(!obs_source_get_monitoring_enabled(current) ? QStringLiteral("모니터링 꺼짐 — 아래 음량은 모니터링을 켠 뒤 적용됩니다.")
+					: !obs_source_get_audio_mixers(current) ? QStringLiteral("모니터링 켜짐 · 출력 트랙 선택 없음")
+					: QStringLiteral("모니터링 켜짐 · 선택한 출력 트랙으로 녹음·방송"));
 				const float volume = obs_source_get_monitoring_volume(current);
-				monitorVolume->setValue(volume < 0 ? -1 : int(volume * 100.0f + 0.5f));
+				if (!monitorVolume->hasFocus()) monitorVolume->setValue(volume < 0 ? -1 : int(volume * 100.0f + 0.5f));
 				OBSSource gain = findGain(current); OBSDataAutoRelease settings = gain ? obs_source_get_settings(gain) : nullptr;
-				inputGain->setValue(settings && obs_source_enabled(gain) ? int(obs_data_get_double(settings, "db")) : 0);
+				if (!inputGain->hasFocus()) inputGain->setValue(settings && obs_source_enabled(gain) ? int(obs_data_get_double(settings, "db")) : 0);
 			};
 			connect(volumeSync, &QTimer::timeout, group, syncVolumes); volumeSync->start(1000); syncVolumes();
 			auto managedFilter = [](obs_source_t *current) -> OBSSource {

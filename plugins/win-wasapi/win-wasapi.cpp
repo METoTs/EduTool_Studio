@@ -169,6 +169,8 @@ class WASAPISource {
 	std::atomic<bool> useDeviceTiming = false;
 	std::atomic<bool> isDefaultDevice = false;
 	std::atomic<bool> sawBadTimestamp = false;
+	// 0: waiting/stopped, 1: capture initialized, 2: failed/reconnecting.
+	std::atomic<int> captureState = 0;
 	bool hooked = false;
 
 	bool previouslyFailed = false;
@@ -268,6 +270,7 @@ class WASAPISource {
 
 public:
 	WASAPISource(obs_data_t *settings, obs_source_t *source_, SourceType type);
+	int GetCaptureState() const { return captureState.load(); }
 	~WASAPISource();
 
 	void Update(obs_data_t *settings);
@@ -440,6 +443,7 @@ void WASAPISource::Start()
 
 void WASAPISource::Stop()
 {
+	captureState = 0;
 	SetEvent(stopSignal);
 
 	blog(LOG_INFO, "WASAPI: Device '%s' Terminated", device_name.c_str());
@@ -953,6 +957,7 @@ bool WASAPISource::TryInitialize()
 	}
 
 	previouslyFailed = !success;
+	captureState = success ? 1 : 2;
 	return success;
 }
 
@@ -1196,6 +1201,7 @@ DWORD WINAPI WASAPISource::CaptureThread(LPVOID param)
 			}
 		} while (!stop);
 
+		source->captureState = reconnect ? 2 : 0;
 		sig_count = _countof(inactive_sigs);
 		sigs = inactive_sigs;
 
@@ -1321,6 +1327,7 @@ void WASAPISource::OnSampleReady()
 	}
 
 	if (stop) {
+		captureState = reconnect ? 2 : 0;
 		client->Stop();
 
 		capture.Clear();
@@ -1439,7 +1446,12 @@ static void *CreateWASAPISource(obs_data_t *settings, obs_source_t *source, Sour
 {
 	try {
 		if (type != SourceType::ProcessOutput) {
-			return new WASAPISource(settings, source, type);
+			auto *captureSource = new WASAPISource(settings, source, type);
+			proc_handler_add(obs_source_get_proc_handler(source), "void edutool_capture_state(out int state)",
+				[](void *data, calldata_t *cd) {
+					calldata_set_int(cd, "state", static_cast<WASAPISource *>(data)->GetCaptureState());
+				}, captureSource);
+			return captureSource;
 		} else {
 			WASAPISource *wasapi_source = new WASAPISource(settings, source, type);
 

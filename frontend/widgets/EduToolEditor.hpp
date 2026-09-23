@@ -84,7 +84,7 @@ private:
 	void renderPausedFrame();
 	void advancePlayback();
 	void toggleFullscreen();
-	QString projectPath, exportPath, errorTail;
+	QString projectPath, exportPath, completedExportPath, errorTail;
 	std::unique_ptr<QTemporaryDir> temporary;
 	QVector<EduToolClip> renderClips;
 	QStringList renderFiles;

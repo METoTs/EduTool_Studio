@@ -25,6 +25,7 @@
 #include <dialogs/NameDialog.hpp>
 #include <dialogs/OBSBasicAdvAudio.hpp>
 #include <dialogs/OBSBasicSourceSelect.hpp>
+#include <dialogs/OBSBasicProperties.hpp>
 #include <utility/item-widget-helpers.hpp>
 
 #include <qt-wrappers.hpp>
@@ -981,17 +982,32 @@ void OBSBasic::OpenEduToolSourceManager()
 		CreateSceneUndoRedoAction(QStringLiteral("소스 표시 변경"), before, BackupScene(GetCurrentSceneSource()));
 		SaveProject();
 	});
-	connect(add, &QPushButton::clicked, dialog, [this, dialog]() {
+	auto restoreManager = [this, dialog]() {
+		if (properties && properties->isVisible()) {
+			connect(properties, &QDialog::finished, dialog, [dialog](int) { dialog->show(); dialog->raise(); });
+			properties->raise();
+			properties->activateWindow();
+		} else {
+			dialog->show();
+			dialog->raise();
+		}
+	};
+	connect(add, &QPushButton::clicked, dialog, [this, dialog, restoreManager]() {
 		dialog->hide();
 		ui->actionAddSource->trigger();
 		if (addWindow)
-			connect(addWindow, &QObject::destroyed, dialog, [dialog]() { dialog->show(); });
+			connect(addWindow, &QObject::destroyed, dialog, [dialog, restoreManager]() {
+				QTimer::singleShot(0, dialog, restoreManager);
+			});
 		else
 			dialog->show();
 	});
-	connect(propertiesButton, &QPushButton::clicked, dialog, [this, selected]() {
-		if (OBSSceneItem item = selected())
+	connect(propertiesButton, &QPushButton::clicked, dialog, [this, dialog, selected, restoreManager]() {
+		if (OBSSceneItem item = selected()) {
+			dialog->hide();
 			CreatePropertiesWindow(obs_sceneitem_get_source(item));
+			restoreManager();
+		}
 	});
 	connect(up, &QPushButton::clicked, dialog, [this, selectMain, refresh]() {
 		if (selectMain()) on_actionMoveUp_triggered();

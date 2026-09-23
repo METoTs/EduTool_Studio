@@ -172,7 +172,7 @@ EduToolEditor::EduToolEditor(QWidget *parent) : QWidget(parent)
 	video = new QVideoWidget(preview); preview->addWidget(video);
 	video->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
 	stillFrame = new EduToolStillFrame(preview); preview->addWidget(stillFrame);
-	list = new QListWidget(splitter); list->setMinimumWidth(200); list->setWordWrap(true); list->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+	list = new QListWidget(splitter); list->setMinimumWidth(220); list->setWordWrap(true); list->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
 	splitter->setStretchFactor(0, 0); splitter->setStretchFactor(1, 4); splitter->setStretchFactor(2, 1);
 	QTimer::singleShot(0, this, [splitter]() { splitter->setSizes({0, 900, 250}); });
 	player = new QMediaPlayer(this); audio = new QAudioOutput(this); audio->setVolume(0.7f);
@@ -205,8 +205,13 @@ EduToolEditor::EduToolEditor(QWidget *parent) : QWidget(parent)
 	start = new QDoubleSpinBox(this); end = new QDoubleSpinBox(this);
 	for (auto *spin : {start, end}) { spin->setDecimals(3); spin->setSuffix(QStringLiteral(" 초")); edits->addWidget(spin); }
 	start->setAccessibleName(QStringLiteral("선택 시작")); end->setAccessibleName(QStringLiteral("선택 끝"));
-	for (auto *spin : {start, end}) connect(spin, &QDoubleSpinBox::valueChanged, this, [this](double) {
+	auto *selectionLength = new QLabel(QStringLiteral("선택 길이: 0.000 초"), this);
+	selectionLength->setAccessibleName(QStringLiteral("선택 구간 길이"));
+	layout->addWidget(selectionLength);
+	for (auto *spin : {start, end}) connect(spin, &QDoubleSpinBox::valueChanged, this, [this, selectionLength](double) {
 		timeline->from = qint64(start->value() * 1000); timeline->to = qint64(end->value() * 1000); timeline->update();
+		selectionLength->setText(end->value() < start->value() ? QStringLiteral("선택 범위 오류: 끝 시간을 시작 시간 이후로 지정하세요.")
+			: QStringLiteral("선택 길이: %1 초").arg(end->value() - start->value(), 0, 'f', 3));
 	});
 	button(edits, QStringLiteral("선택 재생"), [this]() {
 		if (end->value() <= start->value()) { showError(QStringLiteral("끝 시간을 시작 시간보다 뒤로 설정하세요.")); return; }
@@ -229,9 +234,9 @@ EduToolEditor::EduToolEditor(QWidget *parent) : QWidget(parent)
 	auto *exportRow = new QHBoxLayout; layout->addLayout(exportRow); bottom = exportRow;
 	button(bottom, QStringLiteral("조각 저장"), [this]() { exportVideo(true); });
 	button(bottom, QStringLiteral("영상 내보내기"), [this]() { exportVideo(false); });
-	button(bottom, QStringLiteral("완료 영상 업로드"), [this]() {
-		if (exporting || exportPath.isEmpty() || !QFileInfo(exportPath).isFile()) { showError(QStringLiteral("먼저 영상 내보내기를 완료하세요.")); return; }
-		emit uploadRequested(exportPath);
+	button(bottom, QStringLiteral("마지막 완료 영상 업로드"), [this]() {
+		if (exporting || completedExportPath.isEmpty() || !QFileInfo(completedExportPath).isFile()) { showError(QStringLiteral("먼저 영상 내보내기를 완료하세요.")); return; }
+		emit uploadRequested(completedExportPath);
 	});
 	auto *cancel = button(bottom, QStringLiteral("작업 취소"), [this]() {
 		if (importing) { importFailed(QStringLiteral("가져오기를 취소했습니다.")); }
@@ -308,7 +313,11 @@ void EduToolEditor::checkpoint() { undo.push_back(snapshot()); if (undo.size() >
 void EduToolEditor::refresh()
 {
 	pendingPlay = false; player->pause(); list->clear();
-	for (const auto &c : clips) list->addItem(QStringLiteral("%1\n%2 — %3\n%4×%5 · %6 FPS · %7 MB").arg(c.name, stamp(c.in), stamp(c.out)).arg(c.width).arg(c.height).arg(c.fps, 0, 'f', 2).arg(QFileInfo(c.path).size() / (1024.0 * 1024.0), 0, 'f', 1));
+	for (const auto &c : clips) {
+		const QString details = QStringLiteral("%1\n%2 — %3\n%4×%5\n%6 FPS · %7 MB").arg(c.name, stamp(c.in), stamp(c.out)).arg(c.width).arg(c.height).arg(c.fps, 0, 'f', 2).arg(QFileInfo(c.path).size() / (1024.0 * 1024.0), 0, 'f', 1);
+		auto *item = new QListWidgetItem(details, list);
+		item->setToolTip(details + "\n" + c.path);
+	}
 	start->setMaximum(total() / 1000.0); end->setMaximum(total() / 1000.0);
 	timeline->clips = clips; timeline->length = total(); timeline->update(); seek(std::min(position, total()));
 }
@@ -623,5 +632,5 @@ void EduToolEditor::renderNext()
 void EduToolEditor::finishExport(bool success, const QString &message)
 {
 	exporting = false; temporary.reset(); setBusy(false); status->setText(message);
-	if (success) emit exportReady(exportPath);
+	if (success) { completedExportPath = exportPath; emit exportReady(completedExportPath); }
 }
