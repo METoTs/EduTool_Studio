@@ -4,8 +4,8 @@
   "baseline": "docs/edutool-tc-results-20260923-after-recheck.json",
   "scope": "Computer Use 실제 실행 재검증. 누적 판정이며 전체97건을 이번에 재실행한 것은 아님.",
   "counts": {
-    "통과": 40,
-    "부분 확인": 22,
+    "통과": 42,
+    "부분 확인": 20,
     "기존 통과": 4,
     "차단": 31
   },
@@ -244,14 +244,19 @@
       "id": "TC-111",
       "procedure": "소스 표시/숨김과 순서 변경",
       "expected": "프리뷰와 녹화 결과에 변경이 반영된다.",
-      "status": "부분 확인",
-      "result": "소스 아래로 이동 시 이미지가 카메라 위로 표시되고, 카메라 체크 해제 시 프리뷰에서 사라짐. 변경 상태의 녹화 결과는 미확인.",
+      "status": "통과",
+      "result": "녹화 중 이미지 순서를 텍스트 위로 변경하고 체크 해제. 프리뷰 변화와 실제 MP4 5초(텍스트+이미지),190초(이미지만),196초(텍스트만) 프레임 일치 확인.",
       "evidence": [
         "tc-screenshots/full-tc-20260923/TC-111-order.png",
-        "tc-screenshots/full-tc-20260923/TC-111-hide.png"
+        "tc-screenshots/full-tc-20260923/TC-111-hide.png",
+        "tc-screenshots/remaining-tc-20260923/33-image-order-up.png",
+        "tc-screenshots/remaining-tc-20260923/34-image-hidden-record.png",
+        "tc-screenshots/remaining-tc-20260923/record-frame-5.png",
+        "tc-screenshots/remaining-tc-20260923/record-frame-190.png",
+        "tc-screenshots/remaining-tc-20260923/record-frame-196.png"
       ],
       "previousStatus": "부분 확인",
-      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+      "verificationRun": "remaining-tc-20260923"
     },
     {
       "id": "TC-112",
@@ -463,14 +468,17 @@
       "id": "TC-126",
       "procedure": "녹화 종료",
       "expected": "REC 표시가 해제되고 지정 폴더에 재생 가능한 파일이 남으며 완료 알림이 한 번 표시된다.",
-      "status": "부분 확인",
-      "result": "녹화 종료 후 REC 해제·완료 파일 경로 알림·파일 생성 확인. 이번 생성 파일의 실제 앱 재생은 후속 확인 대상.",
+      "status": "통과",
+      "result": "새 녹화 MP4 207.733초 저장·REC 해제 후 앱 편집기에서 재열기, 실제 재생 시간 0→7초 진행 확인. 이전 완료 경로 알림 증거와 합산.",
       "evidence": [
         "tc-screenshots/full-tc-20260923/TC-126-complete.png",
-        "tc-screenshots/full-tc-20260923/record-probe.json"
+        "tc-screenshots/full-tc-20260923/record-probe.json",
+        "tc-screenshots/remaining-tc-20260923/36-layer-record-saved.png",
+        "tc-screenshots/remaining-tc-20260923/37-record-open.png",
+        "tc-screenshots/remaining-tc-20260923/38-record-playing.png"
       ],
       "previousStatus": "부분 확인",
-      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+      "verificationRun": "remaining-tc-20260923"
     },
     {
       "id": "TC-127",
@@ -1403,11 +1411,11 @@
   ],
   "metrics": {
     "total": 97,
-    "passed": 44,
+    "passed": 46,
     "excluded": 37,
     "eligible": 60,
-    "allRate": 45.4,
-    "eligibleRate": 73.3
+    "allRate": 47.4,
+    "eligibleRate": 76.7
   },
   "improvements": {
     "IMP-01": {
