@@ -15,6 +15,20 @@
 #include <QStandardPaths>
 #include <QStorageInfo>
 #include <QMessageBox>
+#include <QKeyEvent>
+
+class FolderAddressEdit : public QLineEdit {
+public:
+	using QLineEdit::QLineEdit;
+protected:
+	void keyPressEvent(QKeyEvent *event) override
+	{
+		QLineEdit::keyPressEvent(event);
+		// returnPressed navigates, but must not propagate to QDialog's default button.
+		if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter)
+			event->accept();
+	}
+};
 
 EduToolFileBrowser::EduToolFileBrowser(QWidget *parent) : QWidget(parent)
 {
@@ -25,7 +39,7 @@ EduToolFileBrowser::EduToolFileBrowser(QWidget *parent) : QWidget(parent)
 	auto *up = new QPushButton(QStringLiteral("상위 폴더"), this);
 	auto *home = new QPushButton(QStringLiteral("동영상 폴더"), this);
 	bar->addWidget(up); bar->addWidget(home);
-	address = new QLineEdit(this); address->setAccessibleName(QStringLiteral("탐색기 폴더 경로"));
+	address = new FolderAddressEdit(this); address->setAccessibleName(QStringLiteral("탐색기 폴더 경로"));
 	layout->addWidget(address);
 	auto *filter = new QComboBox(this);
 	filter->addItems({QStringLiteral("영상 파일"), QStringLiteral("편집 작업 (*.json)"), QStringLiteral("모든 파일")});
@@ -85,11 +99,21 @@ static EduToolFileBrowser *setup(QDialog &dialog, const QString &title, const QS
 	if (!path.isEmpty()) browser->navigate(QFileInfo(path).isDir() ? path : QFileInfo(path).absolutePath());
 	return browser;
 }
+
+static void disableDefaultButtons(QDialogButtonBox *buttons)
+{
+	// Enter in the folder address navigates; it must not also accept the dialog.
+	for (auto *button : buttons->findChildren<QPushButton *>()) {
+		button->setAutoDefault(false);
+		button->setDefault(false);
+	}
+}
 QStringList EduToolFileBrowser::openFiles(QWidget *parent, const QString &title, const QString &path, bool projects)
 {
 	QDialog dialog(parent); auto *browser = setup(dialog, title, path);
 	if (projects) browser->findChild<QComboBox *>()->setCurrentIndex(1);
 	auto *buttons = new QDialogButtonBox(QDialogButtonBox::Open | QDialogButtonBox::Cancel, &dialog); dialog.layout()->addWidget(buttons);
+	disableDefaultButtons(buttons);
 	QStringList result;
 	auto accept = [&dialog, &result](const QStringList &paths) { if (!paths.isEmpty()) { result = paths; dialog.accept(); } };
 	connect(browser, &EduToolFileBrowser::filesActivated, &dialog, accept);
@@ -101,6 +125,7 @@ QString EduToolFileBrowser::selectDirectory(QWidget *parent, const QString &titl
 {
 	QDialog dialog(parent); auto *browser = setup(dialog, title, path);
 	auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+	disableDefaultButtons(buttons);
 	buttons->button(QDialogButtonBox::Ok)->setText(QStringLiteral("현재 폴더 선택")); dialog.layout()->addWidget(buttons);
 	connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
 	connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
@@ -114,6 +139,7 @@ QString EduToolFileBrowser::saveFile(QWidget *parent, const QString &title, cons
 	dialog.layout()->addWidget(name);
 	auto *message = new QLabel(&dialog); message->setWordWrap(true); dialog.layout()->addWidget(message);
 	auto *buttons = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, &dialog); dialog.layout()->addWidget(buttons);
+	disableDefaultButtons(buttons);
 	QString result;
 	connect(buttons, &QDialogButtonBox::accepted, &dialog, [&]() {
 		QString file = name->text().trimmed();
