@@ -1,0 +1,1189 @@
+{
+  "date": "2026-09-23",
+  "codeCommit": "a29ce3da2",
+  "baseline": "edutool-tc-results-20260923.json",
+  "scope": "로컬 실패/차단 수정 재검증. 로그인·인증·서버·실제 방송/업로드 제외. 미재시험 항목은 이전 판정 유지.",
+  "counts": {
+    "통과": 28,
+    "부분 확인": 32,
+    "기존 통과": 4,
+    "차단": 33
+  },
+  "cases": [
+    {
+      "id": "TC-001",
+      "procedure": "앱 실행 후 녹화·라이브·편집·업로드를 차례로 선택",
+      "expected": "선택한 기능 화면과 활성 메뉴가 일치하고 이전 기능의 실행 상태가 임의로 바뀌지 않는다.",
+      "status": "통과",
+      "result": "재시작 편집 화면에 도크 겹침 없음. 녹화→라이브→업로드→녹화 전환 후 선택 화면과 메뉴 일치, 녹화 제어판 유지. 서버 연결 없이 대기 상태에서 확인.",
+      "evidence": [
+        "tc-screenshots/fixes-20260923/45-final-start-layout.png",
+        "tc-screenshots/fixes-20260923/46-final-record.png",
+        "tc-screenshots/fixes-20260923/47-final-live-layout.png",
+        "tc-screenshots/fixes-20260923/48-final-upload-layout.png",
+        "tc-screenshots/fixes-20260923/49-record-after-switching.png"
+      ],
+      "previousStatus": "실패",
+      "verificationRun": "fixes-20260923"
+    },
+    {
+      "id": "TC-002",
+      "procedure": "메인화면의 메뉴·버튼 확인",
+      "expected": "공통 설정 내용/화면은 없고, 녹화·카메라·오디오·업로드 등 기능별 설정 진입점은 제공된다.",
+      "status": "통과",
+      "result": "상단은 기능별 녹화/방송 설정 진입점이며 파일 메뉴에 공통 설정 화면 항목 없음. 카메라·오디오·업로드 기능별 설정 제공 확인. 참고 02의 메인 공통 설정 내용은 제외.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-002-menu.png",
+        "tc-screenshots/full-tc-20260923/TC-107-record-settings.png",
+        "tc-screenshots/full-tc-20260923/TC-118-audio.png"
+      ],
+      "previousStatus": "통과",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-003",
+      "procedure": "창 최소 크기와 일반 크기에서 주요 화면 확인",
+      "expected": "주요 실행 버튼, 상태, 미리보기에 겹침·잘림이 없고 필요한 영역은 스크롤 가능하다.",
+      "status": "부분 확인",
+      "result": "일반 크기에서 버튼 여러 행 배치와 조각 메타데이터 줄바꿈 확인. 원본 해상도에 따른 미리보기 팽창을 크기 정책으로 보완. 최소 창 크기 전체 검증은 남음.",
+      "evidence": [
+        "tc-screenshots/fixes-20260923/45-final-start-layout.png",
+        "tc-screenshots/fixes-20260923/53-recording-loaded.png",
+        "tc-screenshots/fixes-20260923/61-layout-after-play.png"
+      ],
+      "previousStatus": "실패",
+      "verificationRun": "fixes-20260923"
+    },
+    {
+      "id": "TC-004",
+      "procedure": "앱 재실행",
+      "expected": "마지막에 저장한 기능별 설정과 계정 유지 선택 상태가 정책대로 복원된다.",
+      "status": "부분 확인",
+      "result": "마지막 기능·녹화 경로는 재실행 시 유지. 계정 유지 정책은 시험 계정 부재로 미확인. 화면 복원 결함은 TC-001 참조.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/startup.png"
+      ],
+      "previousStatus": "부분 확인",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-005",
+      "procedure": "카메라·마이크·PC 소리를 연결/분리",
+      "expected": "각 장치 상태가 실제 연결 상태에 맞춰 바뀌고 오류 장치에 정상 표시가 남지 않는다.",
+      "status": "부분 확인",
+      "result": "실제 C920 연결·영상 확인. 장치 물리 분리/재연결은 미수행. 마이크 초기화 오류 로그가 있으나 연결됨으로 표시되어 정상 입력 여부 추가 확인 필요.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-112-camera-added.png"
+      ],
+      "previousStatus": "부분 확인",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-006",
+      "procedure": "기능 처리 중 오류 발생",
+      "expected": "실패 원인과 재시도 또는 설정 이동 방법을 사용자에게 표시한다.",
+      "status": "통과",
+      "result": "선택 시간 역전 및 미설정 방송 시작 시 원인 안내와 설정/취소 동작 확인.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-512-error.png",
+        "tc-screenshots/full-tc-20260923/TC-406-unconfigured.png"
+      ],
+      "previousStatus": "통과",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-007",
+      "procedure": "긴 작업 중 다른 기능 화면으로 이동 후 복귀",
+      "expected": "녹화·방송·업로드 진행 상태와 시간이 실제 작업 상태와 일치한다.",
+      "status": "부분 확인",
+      "result": "녹화 중 편집·라이브 전환/복귀해도 REC 시간과 파일 기록 유지. 방송·업로드 진행 중 전환은 연결 환경 부재로 미확인.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-007-recording-edit.png",
+        "tc-screenshots/full-tc-20260923/TC-007-return.png",
+        "tc-screenshots/full-tc-20260923/TC-404-live-shared-camera.png"
+      ],
+      "previousStatus": "부분 확인",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-101",
+      "procedure": "녹화 화면 진입",
+      "expected": "OBS 출력과 동일한 프리뷰가 표시되고 해상도/FPS가 실제 출력 설정과 일치한다.",
+      "status": "기존 통과",
+      "result": "이전 실행에서 통과한 항목. docs/edutool-progress.md 및 1:1 비교 자료 참조. 이번 전체 점검에서 모든 절차를 재수행한 것은 아님.",
+      "evidence": [],
+      "previousStatus": "기존 통과",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-102",
+      "procedure": "프리뷰 전체화면 진입 후 종료",
+      "expected": "영상 표시만 확대되고 녹화·방송 상태는 유지된다.",
+      "status": "통과",
+      "result": "녹화 중 전체화면 진입 및 Escape 복귀 후 REC 시간 증가·녹화 유지.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-102-fullscreen.png",
+        "tc-screenshots/full-tc-20260923/TC-102-return.png"
+      ],
+      "previousStatus": "통과",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-103",
+      "procedure": "우측 상태 패널 접기/펴기",
+      "expected": "프리뷰 크기가 다시 계산되고 장치 상태가 유지된다.",
+      "status": "통과",
+      "result": "상태 패널 접기/펴기 후 미리보기 영역 변경 및 상태 유지 확인.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-103-panel-open.png"
+      ],
+      "previousStatus": "통과",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-104",
+      "procedure": "구도 조정 진입 후 소스 위치 변경",
+      "expected": "프리뷰와 실제 녹화 파일에 동일한 구도가 반영된다.",
+      "status": "기존 통과",
+      "result": "이전 실행에서 통과한 항목. docs/edutool-progress.md 및 1:1 비교 자료 참조. 이번 전체 점검에서 모든 절차를 재수행한 것은 아님.",
+      "evidence": [],
+      "previousStatus": "기존 통과",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-105",
+      "procedure": "녹화 폴더·품질·형식 선택 후 저장, 재진입",
+      "expected": "선택한 값이 유지되고 이후 녹화에 적용된다.",
+      "status": "기존 통과",
+      "result": "이전 실행에서 통과한 항목. docs/edutool-progress.md 및 1:1 비교 자료 참조. 이번 전체 점검에서 모든 절차를 재수행한 것은 아님.",
+      "evidence": [],
+      "previousStatus": "기존 통과",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-106",
+      "procedure": "녹화 설정 변경 후 취소",
+      "expected": "저장 전 값이 적용되지 않는다.",
+      "status": "기존 통과",
+      "result": "이전 실행에서 통과한 항목. docs/edutool-progress.md 및 1:1 비교 자료 참조. 이번 전체 점검에서 모든 절차를 재수행한 것은 아님.",
+      "evidence": [],
+      "previousStatus": "기존 통과",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-107",
+      "procedure": "기능별 녹화 설정을 기본값으로 초기화",
+      "expected": "녹화 설정만 기본값으로 돌아가고 계정·다른 기능 설정은 유지된다.",
+      "status": "부분 확인",
+      "result": "녹화 기본 설정 초기화 버튼으로 저장 경로가 사용자 Videos 기본값으로 변경됨. 취소해 기존 경로 유지. 인증된 계정·타 기능 설정의 보존은 미확인.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-107-record-settings.png",
+        "tc-screenshots/full-tc-20260923/TC-107-reset.png"
+      ],
+      "previousStatus": "부분 확인",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-108",
+      "procedure": "쓰기 불가 폴더를 저장 위치로 지정하고 녹화 시작",
+      "expected": "녹화가 시작되지 않으며 유효한 경로를 고를 수 있는 오류가 표시된다.",
+      "status": "차단",
+      "result": "쓰기 권한이 제거된 전용 시험 폴더가 없음. 기존 잘못된 경로 오류 확인은 권한 거부 시험을 대체하지 않음.",
+      "evidence": [],
+      "previousStatus": "차단",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-109",
+      "procedure": "디스크 공간 부족 상태에서 녹화 시작/진행",
+      "expected": "공간 부족을 표시하고 손상된 파일을 성공으로 알리지 않는다.",
+      "status": "차단",
+      "result": "저용량 시험 볼륨 없음. 운영 드라이브를 채우는 방법은 사용하지 않음. 공간 부족 시작/진행 시나리오 미실행.",
+      "evidence": [],
+      "previousStatus": "차단",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-110",
+      "procedure": "카메라·화면·미디어·이미지·텍스트·브라우저 소스를 각각 추가",
+      "expected": "선택한 소스가 목록과 프리뷰에 표시되고 해당 속성 창을 열 수 있다.",
+      "status": "부분 확인",
+      "result": "소스 유형 목록·이미지·실제 C920 카메라 추가/속성 확인. 화면/미디어/텍스트/브라우저는 미확인. 카메라 추가 후 소스 관리 창이 속성 창을 가리는 모달 순서 결함 발견.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-110-types.png",
+        "tc-screenshots/full-tc-20260923/TC-110-camera-properties.png",
+        "tc-screenshots/full-tc-20260923/TC-112-new-camera-pip.png"
+      ],
+      "previousStatus": "부분 확인",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-111",
+      "procedure": "소스 표시/숨김과 순서 변경",
+      "expected": "프리뷰와 녹화 결과에 변경이 반영된다.",
+      "status": "부분 확인",
+      "result": "소스 아래로 이동 시 이미지가 카메라 위로 표시되고, 카메라 체크 해제 시 프리뷰에서 사라짐. 변경 상태의 녹화 결과는 미확인.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-111-order.png",
+        "tc-screenshots/full-tc-20260923/TC-111-hide.png"
+      ],
+      "previousStatus": "부분 확인",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-112",
+      "procedure": "신규 카메라를 PIP 위치 또는 전체 화면으로 배치",
+      "expected": "선택한 배치가 프리뷰와 녹화 결과에 적용된다.",
+      "status": "부분 확인",
+      "result": "PIP 및 전체 화면 배치 프리뷰 확인. 녹화 파일은 프로세스 종료 후 183.367초 파일로 확인됐으나 배치별 결과 프레임 대조는 미완료.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-112-camera-added.png",
+        "tc-screenshots/full-tc-20260923/TC-112-fullscreen-layout.png",
+        "tc-screenshots/full-tc-20260923/shutdown-record-probe.json"
+      ],
+      "previousStatus": "부분 확인",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-113",
+      "procedure": "소스 추가 중 취소 또는 기존 소스 제거",
+      "expected": "취소한 소스는 남지 않고 제거한 소스만 사라진다.",
+      "status": "부분 확인",
+      "result": "시험 중 추가한 카메라만 제거되고 기존 이미지 소스 유지 확인. 소스 추가 취소 분기는 미확인.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-113-removed.png"
+      ],
+      "previousStatus": "부분 확인",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-114",
+      "procedure": "카메라 2대를 연결하고 장치 전환",
+      "expected": "선택 장치의 영상으로 프리뷰가 바뀌고 장치명이 일치한다.",
+      "status": "차단",
+      "result": "실제 카메라 1대(C920) 확인. 서로 다른 2대 전환에 필요한 두 번째 장치 없음.",
+      "evidence": [],
+      "previousStatus": "차단",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-115",
+      "procedure": "카메라 해상도/FPS 변경 후 적용",
+      "expected": "지원하는 값만 선택 가능하며 프리뷰와 녹화 출력이 설정대로 갱신된다.",
+      "status": "부분 확인",
+      "result": "UI 해상도 요약1280×720 변경 및 재시작 후 카메라1280×720 초기화 확인. 변경 직후 로그는640×480만 보여 실시간 반영을 확정하지 못함. 이후 종료 정지는 TC-127에 별도 실패 기록하며 해상도 변경과 인과관계는 미확정.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-115-applied.png",
+        "tc-screenshots/full-tc-20260923/restart-after-hang.png"
+      ],
+      "previousStatus": "부분 확인",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-116",
+      "procedure": "선택한 카메라를 사용 중 분리 후 재연결",
+      "expected": "연결 끊김 표시와 복구 동작이 일치하고 앱이 종료되지 않는다.",
+      "status": "차단",
+      "result": "물리 카메라 분리·재연결을 수행할 사용자 조작 필요.",
+      "evidence": [],
+      "previousStatus": "차단",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-117",
+      "procedure": "카메라 장치 세부 설정 열기",
+      "expected": "해당 카메라 드라이버의 속성 창이 열리고 적용/취소가 정상 동작한다.",
+      "status": "부분 확인",
+      "result": "C920 드라이버 속성 창 진입·취소 복귀 확인. 실제 드라이버 값 변경/적용은 미수행.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-117-driver.png",
+        "tc-screenshots/full-tc-20260923/TC-117-driver-cancel.png"
+      ],
+      "previousStatus": "부분 확인",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-118",
+      "procedure": "마이크와 PC 소리 장치 선택 후 소리 입력",
+      "expected": "각 레벨 미터가 해당 장치에만 반응한다.",
+      "status": "부분 확인",
+      "result": "PC 소리/마이크 장치별 레벨·음소거·장치 선택 UI 확인. 마이크 실음성 입력과 분리된 두 신호 주입은 미실행.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-118-audio.png"
+      ],
+      "previousStatus": "부분 확인",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-119",
+      "procedure": "입력·모니터링·녹음 볼륨 변경 후 짧게 녹화",
+      "expected": "모니터링과 저장 파일의 음량이 설정에 맞고 서로 혼동되지 않는다.",
+      "status": "차단",
+      "result": "실제 모니터링 음량의 청감 확인 및 별도 마이크 신호가 필요. 입력·모니터링·출력 컨트롤 표시만 확인했으며 음량 검증으로 간주하지 않음.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-118-audio.png"
+      ],
+      "previousStatus": "차단",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-120",
+      "procedure": "PC 소리 캡처를 켜고/끄고 각각 녹화",
+      "expected": "켠 파일에만 PC 소리가 포함된다.",
+      "status": "차단",
+      "result": "PC 소리 포함/제외 파일의 실소리 비교 미수행. 현재 녹화는 PC/마이크 음소거 상태. 음성 검증 가능한 입력 환경에서 재시험 필요.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-118-audio.png"
+      ],
+      "previousStatus": "차단",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-121",
+      "procedure": "자동 음량 조절을 켜고/끄고 설정 저장",
+      "expected": "선택 상태가 유지되고 적용 범위가 마이크/PC 소리 구분과 일치한다.",
+      "status": "부분 확인",
+      "result": "PC 소리 자동 조절 ON 시 해당 소스에 EduTool 자동 음량 압축 필터가 생성됨. OFF로 복원. 앱 재시작/마이크 독립 적용은 미확인.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-121-auto-on.png",
+        "tc-screenshots/full-tc-20260923/TC-121-filter-added.png",
+        "tc-screenshots/full-tc-20260923/TC-121-auto-off.png"
+      ],
+      "previousStatus": "부분 확인",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-122",
+      "procedure": "노이즈 게이트 등 오디오 필터 추가·순서 변경·비활성화",
+      "expected": "OBS 필터 구성에 반영되고 재진입 후에도 유지된다.",
+      "status": "통과",
+      "result": "데스크탑 오디오에 노이즈 게이트 추가→압축 필터 앞으로 이동→비활성화→닫고 재진입 후 순서/비활성 상태 유지. 시험 필터 제거 완료.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-122-added.png",
+        "tc-screenshots/full-tc-20260923/TC-122-order.png",
+        "tc-screenshots/full-tc-20260923/TC-122-disabled.png",
+        "tc-screenshots/full-tc-20260923/TC-122-reopened.png"
+      ],
+      "previousStatus": "통과",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-123",
+      "procedure": "지연 녹화 없이 시작",
+      "expected": "REC 상태와 경과 시간이 표시되고 실제 파일 쓰기가 시작된다.",
+      "status": "통과",
+      "result": "지연 0에서 즉시 REC 시간 증가·실제 1280x720 H264/AAC 녹화 파일 기록 확인. 파일 크기는 프로세스 종료 후 디스크 반영됨. 종료 실패는 TC-127 별도.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-123-immediate-camera.png",
+        "tc-screenshots/full-tc-20260923/shutdown-record-probe.json"
+      ],
+      "previousStatus": "통과",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-124",
+      "procedure": "지연 녹화 값을 설정하고 시작",
+      "expected": "설정 시간 전에는 파일 기록이 시작되지 않고 카운트다운 후 시작된다.",
+      "status": "통과",
+      "result": "10초 카운트다운 시작 직후 새 파일 없음. 지연 경과 후 REC 시간 증가와 새 파일 확인.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-124-countdown.png",
+        "tc-screenshots/full-tc-20260923/TC-124-before-start.json",
+        "tc-screenshots/full-tc-20260923/TC-124-recording.png"
+      ],
+      "previousStatus": "통과",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-125",
+      "procedure": "녹화 중 시작 버튼 반복 클릭",
+      "expected": "녹화 세션과 출력 파일이 중복 생성되지 않는다.",
+      "status": "부분 확인",
+      "result": "녹화 시작 후 버튼이 녹화 중단으로 바뀌어 동일 시작 동작을 반복할 수 없음. 지연 모달 중 중복 입력 및 별도 단축키 경합은 미확인.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-124-countdown.png",
+        "tc-screenshots/full-tc-20260923/TC-123-immediate-camera.png"
+      ],
+      "previousStatus": "부분 확인",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-126",
+      "procedure": "녹화 종료",
+      "expected": "REC 표시가 해제되고 지정 폴더에 재생 가능한 파일이 남으며 완료 알림이 한 번 표시된다.",
+      "status": "부분 확인",
+      "result": "녹화 종료 후 REC 해제·완료 파일 경로 알림·파일 생성 확인. 이번 생성 파일의 실제 앱 재생은 후속 확인 대상.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-126-complete.png",
+        "tc-screenshots/full-tc-20260923/record-probe.json"
+      ],
+      "previousStatus": "부분 확인",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-127",
+      "procedure": "녹화 중 앱 종료 요청",
+      "expected": "기록 중임을 알리고 종료/취소 선택에 따라 파일 마무리가 안전하게 처리된다.",
+      "status": "통과",
+      "result": "녹화 중 종료 확인 1회 후 비동기 중지와 출력 비활성화를 기다려 정상 종료. 19.633333초/14,753,856바이트 MP4 전체 디코딩 exit 0, 종료 로그 memory leaks 0. 앞선 수정 중 재시도 기록과 구분.",
+      "evidence": [
+        "tc-screenshots/fixes-20260923/18-final-exit-prompt.png",
+        "tc-screenshots/fixes-20260923/19-final-record-stop.png",
+        "tc-screenshots/fixes-20260923/record-exit-final.log",
+        "tc-screenshots/fixes-20260923/record-exit-final-probe.json",
+        "tc-screenshots/fixes-20260923/record-exit-final-decode.log"
+      ],
+      "previousStatus": "실패",
+      "verificationRun": "fixes-20260923"
+    },
+    {
+      "id": "TC-128",
+      "procedure": "저장 폴더 아이콘 또는 현재 경로 클릭",
+      "expected": "Windows 탐색기가 현재 녹화 폴더를 연다.",
+      "status": "통과",
+      "result": "현재 test-recordings 경로로 Windows 탐색기 열림. 실제 생성 녹화 파일 목록 확인.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-128-explorer-1.png"
+      ],
+      "previousStatus": "통과",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-129",
+      "procedure": "저장 위치 `변경` 클릭",
+      "expected": "폴더 선택 창이 열리며 선택 전에는 기존 경로가 유지된다.",
+      "status": "통과",
+      "result": "변경 클릭 시 폴더 선택 창만 열림. 취소 후 경로 그대로 유지.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-129-folder-dialog.png",
+        "tc-screenshots/full-tc-20260923/TC-129-cancel-path.png"
+      ],
+      "previousStatus": "통과",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-130",
+      "procedure": "저장 위치·여유 공간 표시 확인",
+      "expected": "경로와 공간 값이 실제 선택 드라이브와 일치하고 장치 변경 시 갱신된다.",
+      "status": "부분 확인",
+      "result": "현재 C 드라이브 남은 공간 78.4GB가 실제 84224569344바이트와 일치. 드라이브 교체 갱신 분기는 미확인.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-129-cancel-path.png"
+      ],
+      "previousStatus": "부분 확인",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-201",
+      "procedure": "정상 이메일/비밀번호로 로그인",
+      "expected": "사용자명과 계정 메뉴가 표시되고 인증이 필요한 기능을 사용할 수 있다.",
+      "status": "차단",
+      "result": "시험용 홈페이지/API·계정 미제공. Computer Use 스킬에서 인증 대화상자 자동 조작을 금지하므로 사용자 로그인 후 재시험 필요.",
+      "evidence": [],
+      "previousStatus": "차단",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-202",
+      "procedure": "잘못된 비밀번호 또는 필수값 누락으로 로그인",
+      "expected": "로그인되지 않고 입력 오류를 알리며 비밀번호를 로그에 남기지 않는다.",
+      "status": "차단",
+      "result": "시험용 홈페이지/API·계정 미제공. Computer Use 스킬에서 인증 대화상자 자동 조작을 금지하므로 사용자 로그인 후 재시험 필요.",
+      "evidence": [],
+      "previousStatus": "차단",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-203",
+      "procedure": "비밀번호 표시/숨기기 전환",
+      "expected": "입력값은 유지되고 화면 표시만 바뀐다.",
+      "status": "차단",
+      "result": "시험용 홈페이지/API·계정 미제공. Computer Use 스킬에서 인증 대화상자 자동 조작을 금지하므로 사용자 로그인 후 재시험 필요.",
+      "evidence": [],
+      "previousStatus": "차단",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-204",
+      "procedure": "로그인 상태 유지 선택/해제 후 앱 재실행",
+      "expected": "선택 시 정책에 따라 세션이 유지되고 해제 시 재로그인이 필요하다.",
+      "status": "차단",
+      "result": "시험용 홈페이지/API·계정 미제공. Computer Use 스킬에서 인증 대화상자 자동 조작을 금지하므로 사용자 로그인 후 재시험 필요.",
+      "evidence": [],
+      "previousStatus": "차단",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-205",
+      "procedure": "Google/Microsoft 로그인 시작 후 취소 또는 실패",
+      "expected": "이전 화면으로 안전하게 돌아오고 로그인된 상태로 오인하지 않는다.",
+      "status": "차단",
+      "result": "시험용 홈페이지/API·계정 미제공. Computer Use 스킬에서 인증 대화상자 자동 조작을 금지하므로 사용자 로그인 후 재시험 필요.",
+      "evidence": [],
+      "previousStatus": "차단",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-206",
+      "procedure": "로그인 후 계정 정보 열기",
+      "expected": "실제 계정명·이메일·연결 홈페이지·계정 정보를 표시한다.",
+      "status": "차단",
+      "result": "시험용 홈페이지/API·계정 미제공. Computer Use 스킬에서 인증 대화상자 자동 조작을 금지하므로 사용자 로그인 후 재시험 필요.",
+      "evidence": [],
+      "previousStatus": "차단",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-207",
+      "procedure": "계정 메뉴에서 로그아웃",
+      "expected": "인증 상태가 해제되고 업로드·계정 정보 접근이 정책대로 제한된다.",
+      "status": "차단",
+      "result": "시험용 홈페이지/API·계정 미제공. Computer Use 스킬에서 인증 대화상자 자동 조작을 금지하므로 사용자 로그인 후 재시험 필요.",
+      "evidence": [],
+      "previousStatus": "차단",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-208",
+      "procedure": "연결 홈페이지 변경",
+      "expected": "새 연결 대상이 표시되고 이후 업로드 대상 목록에 반영된다.",
+      "status": "차단",
+      "result": "시험용 홈페이지/API·계정 미제공. Computer Use 스킬에서 인증 대화상자 자동 조작을 금지하므로 사용자 로그인 후 재시험 필요.",
+      "evidence": [],
+      "previousStatus": "차단",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-209",
+      "procedure": "사용 중 세션 만료",
+      "expected": "재로그인을 요청하고 진행 중 데이터/파일을 임의로 삭제하지 않는다.",
+      "status": "차단",
+      "result": "시험용 홈페이지/API·계정 미제공. Computer Use 스킬에서 인증 대화상자 자동 조작을 금지하므로 사용자 로그인 후 재시험 필요.",
+      "evidence": [],
+      "previousStatus": "차단",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-301",
+      "procedure": "연결된 홈페이지의 강좌·폴더 목록 열기",
+      "expected": "현재 계정에 허용된 대상만 표시된다.",
+      "status": "차단",
+      "result": "시험용 홈페이지/API·로그인·업로드 대상 미제공. 실제 서버 결과를 확인할 수 없음.",
+      "evidence": [],
+      "previousStatus": "차단",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-302",
+      "procedure": "강좌·폴더 선택 후 다시 열기",
+      "expected": "선택한 대상이 유지되고 업로드 요청의 대상과 일치한다.",
+      "status": "차단",
+      "result": "시험용 홈페이지/API·로그인·업로드 대상 미제공. 실제 서버 결과를 확인할 수 없음.",
+      "evidence": [],
+      "previousStatus": "차단",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-303",
+      "procedure": "새 폴더 생성",
+      "expected": "생성된 폴더가 목록에 나타나고 업로드 대상으로 선택 가능하다.",
+      "status": "차단",
+      "result": "시험용 홈페이지/API·로그인·업로드 대상 미제공. 실제 서버 결과를 확인할 수 없음.",
+      "evidence": [],
+      "previousStatus": "차단",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-304",
+      "procedure": "제목 규칙 적용 및 동일 이름의 파일 업로드",
+      "expected": "미리보기 제목과 실제 서버 제목이 일치하고 이름 충돌 정책이 적용된다.",
+      "status": "차단",
+      "result": "시험용 홈페이지/API·로그인·업로드 대상 미제공. 실제 서버 결과를 확인할 수 없음.",
+      "evidence": [],
+      "previousStatus": "차단",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-305",
+      "procedure": "자동 업로드 OFF로 녹화 종료",
+      "expected": "로컬 파일만 저장되고 업로드 요청은 발생하지 않으며 완료 알림을 표시한다.",
+      "status": "부분 확인",
+      "result": "자동 업로드 OFF 상태에서 로컬 녹화 완료와 파일 경로 알림 확인. 서버 요청이 전혀 발생하지 않았다는 네트워크 관찰은 미수행.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-126-complete.png",
+        "tc-screenshots/full-tc-20260923/TC-001-upload.png"
+      ],
+      "previousStatus": "부분 확인",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-306",
+      "procedure": "자동 업로드 ON으로 녹화 종료",
+      "expected": "로컬 파일이 완성된 뒤 지정 대상에 업로드가 시작된다.",
+      "status": "차단",
+      "result": "시험용 홈페이지/API·로그인·업로드 대상 미제공. 실제 서버 결과를 확인할 수 없음.",
+      "evidence": [],
+      "previousStatus": "차단",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-307",
+      "procedure": "업로드 설정 저장 후 앱 재시작",
+      "expected": "자동 업로드·알림·원본 보존 선택이 정책대로 유지된다.",
+      "status": "부분 확인",
+      "result": "완료 알림 ON→OFF 변경 후 앱 재시작에서 OFF 유지 확인. 자동 업로드 OFF와 원본 삭제 OFF도 유지. 시험 후 완료 알림 ON 원복. 자동 업로드/원본 삭제 ON 변경 조합은 미검증.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-307-notify-off.png",
+        "tc-screenshots/full-tc-20260923/TC-307-restarted.png",
+        "tc-screenshots/full-tc-20260923/TC-307-restored.png"
+      ],
+      "previousStatus": "부분 확인",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-308",
+      "procedure": "유효한 영상 수동 업로드",
+      "expected": "진행률이 표시되고 서버에서 영상이 확인되면 완료로 바뀐다.",
+      "status": "차단",
+      "result": "완료 영상 전달 후 업로드 시 로그인/대상 폴더 필요 안내. 사전조건 검사는 확인했으나 실제 업로드는 시험 서버·계정 부재로 차단.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-529-handoff.png",
+        "tc-screenshots/full-tc-20260923/TC-308-no-account.png"
+      ],
+      "previousStatus": "차단",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-309",
+      "procedure": "업로드 중 네트워크 끊기 후 복구",
+      "expected": "실패/일시정지 상태를 명확히 표시하고 재시도 시 중복 영상이 생기지 않는다.",
+      "status": "차단",
+      "result": "시험용 홈페이지/API·로그인·업로드 대상 미제공. 실제 서버 결과를 확인할 수 없음.",
+      "evidence": [],
+      "previousStatus": "차단",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-310",
+      "procedure": "서버 인증 실패 또는 권한 없는 폴더 선택",
+      "expected": "업로드 실패를 알리고 올바른 계정/대상으로 복구할 수 있다.",
+      "status": "차단",
+      "result": "시험용 홈페이지/API·로그인·업로드 대상 미제공. 실제 서버 결과를 확인할 수 없음.",
+      "evidence": [],
+      "previousStatus": "차단",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-311",
+      "procedure": "업로드 중 앱 종료·재시작",
+      "expected": "정의된 재개 정책대로 복구하거나 재시도 가능한 실패 상태를 남긴다.",
+      "status": "차단",
+      "result": "시험용 홈페이지/API·로그인·업로드 대상 미제공. 실제 서버 결과를 확인할 수 없음.",
+      "evidence": [],
+      "previousStatus": "차단",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-312",
+      "procedure": "원본 자동 삭제 옵션 선택 후 업로드 실패",
+      "expected": "로컬 원본이 삭제되지 않는다.",
+      "status": "차단",
+      "result": "시험용 홈페이지/API·로그인·업로드 대상 미제공. 실제 서버 결과를 확인할 수 없음.",
+      "evidence": [],
+      "previousStatus": "차단",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-313",
+      "procedure": "원본 자동 삭제 옵션 선택 후 서버 업로드 검증 성공",
+      "expected": "설정된 정책에 따라 원본을 처리하고 삭제 여부를 알린다.",
+      "status": "차단",
+      "result": "시험용 홈페이지/API·로그인·업로드 대상 미제공. 실제 서버 결과를 확인할 수 없음.",
+      "evidence": [],
+      "previousStatus": "차단",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-401",
+      "procedure": "라이브 화면 진입",
+      "expected": "프리뷰·카메라·마이크·PC 소리 상태와 LIVE/REC 시간이 실제 상태와 일치한다.",
+      "status": "부분 확인",
+      "result": "라이브 진입 시 실제 카메라 프리뷰와 REC 시간 유지. 실제 LIVE 시간 및 마이크 신호는 미확인.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-404-live-shared-camera.png"
+      ],
+      "previousStatus": "부분 확인",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-402",
+      "procedure": "YouTube 계정 연결/해제",
+      "expected": "연결 상태가 즉시 갱신되고 해제 후 방송 시작이 제한된다.",
+      "status": "차단",
+      "result": "시험용 방송 연결/계정·비공개 방송 대상 미제공. 실제 송출·서버 결과 미확인.",
+      "evidence": [],
+      "previousStatus": "차단",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-403",
+      "procedure": "연결 설정 진입 후 변경·취소",
+      "expected": "적용한 값만 방송 연결에 사용된다.",
+      "status": "차단",
+      "result": "시험용 방송 연결/계정·비공개 방송 대상 미제공. 실제 송출·서버 결과 미확인.",
+      "evidence": [],
+      "previousStatus": "차단",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-404",
+      "procedure": "라이브 화면에서 소스 관리/장치 세부 설정 진입",
+      "expected": "녹화와 같은 OBS 소스·장치가 사용되고 변경이 프리뷰에 반영된다.",
+      "status": "통과",
+      "result": "녹화에서 추가한 C920가 라이브 프리뷰와 소스 관리에 동일하게 나타남. 라이브에서 전체 화면 배치·순서·숨김 변경 즉시 반영.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-404-live-shared-camera.png",
+        "tc-screenshots/full-tc-20260923/TC-112-fullscreen-layout.png",
+        "tc-screenshots/full-tc-20260923/TC-111-hide.png"
+      ],
+      "previousStatus": "통과",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-405",
+      "procedure": "정상 연결 상태에서 라이브 시작",
+      "expected": "실제 방송이 시작되고 LIVE 상태와 경과 시간이 표시된다.",
+      "status": "차단",
+      "result": "시험용 방송 연결/계정·비공개 방송 대상 미제공. 실제 송출·서버 결과 미확인.",
+      "evidence": [],
+      "previousStatus": "차단",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-406",
+      "procedure": "YouTube 미연결/유효하지 않은 방송 설정으로 시작",
+      "expected": "방송은 시작되지 않고 해결 가능한 오류가 표시된다.",
+      "status": "통과",
+      "result": "URL/스트림 키 미설정 시 방송 시작 차단·방송 설정 누락 원인과 설정 열기/취소 표시.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-406-unconfigured.png"
+      ],
+      "previousStatus": "통과",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-407",
+      "procedure": "라이브 중 녹화 시작·종료",
+      "expected": "LIVE는 계속 유지되고 REC만 별도로 변하며 녹화 파일이 생성된다.",
+      "status": "차단",
+      "result": "시험용 방송 연결/계정·비공개 방송 대상 미제공. 실제 송출·서버 결과 미확인.",
+      "evidence": [],
+      "previousStatus": "차단",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-408",
+      "procedure": "라이브 종료",
+      "expected": "LIVE 상태가 해제되고 방송 종료가 서버에서도 확인된다. 녹화 처리 정책이 일치한다.",
+      "status": "차단",
+      "result": "시험용 방송 연결/계정·비공개 방송 대상 미제공. 실제 송출·서버 결과 미확인.",
+      "evidence": [],
+      "previousStatus": "차단",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-409",
+      "procedure": "라이브 중 네트워크 또는 장치 장애",
+      "expected": "오류가 표시되고 재연결/종료 후 상태가 실제 방송 상태와 일치한다.",
+      "status": "차단",
+      "result": "시험용 방송 연결/계정·비공개 방송 대상 미제공. 실제 송출·서버 결과 미확인.",
+      "evidence": [],
+      "previousStatus": "차단",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-501",
+      "procedure": "정상 MP4를 파일 선택으로 열기",
+      "expected": "영상·길이·해상도·FPS·파일 크기와 타임라인이 표시된다.",
+      "status": "부분 확인",
+      "result": "8초 H264/AAC 320x240 24fps 파일 열기·타임라인·재생 확인. 우측 FPS 문자열이 잘려 전체 정보 표시 기대는 충족하지 못함.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-501-import.png",
+        "tc-screenshots/full-tc-20260923/TC-506-play.png"
+      ],
+      "previousStatus": "부분 확인",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-502",
+      "procedure": "정상 영상을 창에 끌어놓기",
+      "expected": "TC-501과 동일하게 가져오며 중복 열기 정책이 적용된다.",
+      "status": "통과",
+      "result": "앱 내부 탐색기에서 blue-25fps.avi를 같은 창 타임라인으로 실제 드래그 후 클릭으로 드롭 확정. 맨 앞 삽입 정책에 따라 3초 AVI + 기존 8초 = 11초, 4조각으로 반영. 별도 Windows 탐색기 간 드래그의 도구 제한은 내부 경로로 대체.",
+      "evidence": [
+        "tc-screenshots/fixes-20260923/22-internal-drag.png",
+        "tc-screenshots/fixes-20260923/24-drag-added-11sec.png"
+      ],
+      "previousStatus": "차단",
+      "verificationRun": "fixes-20260923"
+    },
+    {
+      "id": "TC-503",
+      "procedure": "최근 파일에서 영상 열기",
+      "expected": "실제 파일을 열고, 파일이 사라졌다면 목록 정리 또는 위치 찾기를 안내한다.",
+      "status": "통과",
+      "result": "시험 AVI 이름을 일시 변경한 뒤 최근 목록 선택. 누락 경로와 위치 찾기/목록에서 제거 안내 확인. 목록에서 제거 후 다음 항목 표시. 시험 파일 이름은 원복. 위치 찾기 전체 연결 과정은 별도 추가 검증 가능.",
+      "evidence": [
+        "tc-screenshots/fixes-20260923/28-missing-recent-guidance.png",
+        "tc-screenshots/fixes-20260923/29-missing-recent-removed.png"
+      ],
+      "previousStatus": "실패",
+      "verificationRun": "fixes-20260923"
+    },
+    {
+      "id": "TC-504",
+      "procedure": "손상된 파일 또는 지원하지 않는 코덱 열기",
+      "expected": "편집이 시작되지 않고 파일별 원인을 표시하며 기존 작업은 유지된다.",
+      "status": "통과",
+      "result": "손상된 invalid.mp4 추가 시 파일 경로를 포함한 읽기 오류 표시. 기존 8초 클립/타임라인 유지.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-504-invalid-preserved.png"
+      ],
+      "previousStatus": "통과",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-505",
+      "procedure": "두 번째 영상을 추가하거나 새로 불러오기",
+      "expected": "추가는 현재 작업에 포함되고 새로 불러오기는 미저장 변경 처리 후 새 작업을 연다.",
+      "status": "통과",
+      "result": "영상 추가는 기존3조각에 AVI를 앞에 넣어4조각/11초 유지. 새 영상 열기는 미저장 저장/저장안함/취소 확인을 거쳐 저장안함 선택 시 단일 mixed-export.mp4 작업으로 교체.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-520-front.png",
+        "tc-screenshots/full-tc-20260923/TC-505-confirm.png",
+        "tc-screenshots/full-tc-20260923/TC-505-new-loaded.png"
+      ],
+      "previousStatus": "통과",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-506",
+      "procedure": "재생·일시정지·임의 시점 탐색",
+      "expected": "영상·오디오·현재 시간·플레이헤드가 동기화된다.",
+      "status": "부분 확인",
+      "result": "합성 영상 재생 시 화면 타임코드와 현재 시간/플레이헤드 증가 확인. 실음성 청감 동기화는 미확인.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-507-fullscreen.png"
+      ],
+      "previousStatus": "부분 확인",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-507",
+      "procedure": "볼륨 변경·전체화면 진입/종료",
+      "expected": "재생 상태가 유지되고 실제 재생 음량/표시만 바뀐다.",
+      "status": "부분 확인",
+      "result": "전체화면의 Escape 복귀 결함 해결. 정지 프레임과 영상 위젯이 같은 편집 영역으로 복귀함. 실제 음량 변화 청감 검증은 남아 있어 TC 전체 통과로 처리하지 않음.",
+      "evidence": [
+        "tc-screenshots/fixes-20260923/06-fullscreen.png",
+        "tc-screenshots/fixes-20260923/07-fullscreen-return.png",
+        "tc-screenshots/fixes-20260923/42-still-fullscreen.png",
+        "tc-screenshots/fixes-20260923/43-still-fullscreen-return.png"
+      ],
+      "previousStatus": "실패",
+      "verificationRun": "fixes-20260923"
+    },
+    {
+      "id": "TC-508",
+      "procedure": "타임라인 확대/축소",
+      "expected": "보이는 시간 범위가 바뀌되 실제 영상 길이·선택 구간은 바뀌지 않는다.",
+      "status": "통과",
+      "result": "선택 0.980~2.957초·전체 8초·위치 0.980초 유지하며 확대 배율 1→5 변경. 전체 보기에서 1로 축소 확인.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-511-selection.png",
+        "tc-screenshots/full-tc-20260923/TC-508-zoom.png",
+        "tc-screenshots/full-tc-20260923/TC-509-fit.png"
+      ],
+      "previousStatus": "통과",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-509",
+      "procedure": "`전체 보기` 선택",
+      "expected": "전체 길이가 타임라인에 맞춰 표시되고 플레이헤드 위치가 유지된다.",
+      "status": "통과",
+      "result": "전체 보기가 8초 전체를 영역에 맞추고 재생 위치 0.980초 유지.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-509-fit.png"
+      ],
+      "previousStatus": "통과",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-510",
+      "procedure": "긴 영상에서 타임라인 스크롤·탐색",
+      "expected": "시간 눈금·썸네일·재생 위치가 일치하며 조작이 멈추지 않는다.",
+      "status": "통과",
+      "result": "10분·1fps 시험 영상에서 5배 확대, 가로 스크롤, 307.161초 탐색 수행. 영상 내 307초 표기와 1fps 오차 범위 내 일치, 멈춤 없음. 고해상도 부하 시험은 별도.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-510-zoom.png",
+        "tc-screenshots/full-tc-20260923/TC-510-scroll.png",
+        "tc-screenshots/full-tc-20260923/TC-510-seek.png"
+      ],
+      "previousStatus": "통과",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-511",
+      "procedure": "마우스 드래그로 구간 선택",
+      "expected": "시작·끝·길이와 타임라인 강조가 일치한다.",
+      "status": "부분 확인",
+      "result": "드래그 선택 0.980~2.957초와 강조 일치. 구간 길이 1.977초의 독립 표시가 없어 기대 항목 전체 충족은 아님.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-511-selection.png"
+      ],
+      "previousStatus": "부분 확인",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-512",
+      "procedure": "시작/끝 시간을 직접 입력",
+      "expected": "유효한 값만 적용되며 시작이 끝보다 늦거나 길이를 넘으면 오류를 표시한다.",
+      "status": "부분 확인",
+      "result": "시작보다 작은 종료값 입력 후 선택 재생 시 오류 표시 확인. 영상 길이 초과 경계는 미확인.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-512-reversed.png",
+        "tc-screenshots/full-tc-20260923/TC-512-error.png"
+      ],
+      "previousStatus": "부분 확인",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-513",
+      "procedure": "선택 구간 재생 후 선택 해제",
+      "expected": "정확히 선택 구간만 재생되고 해제 후 원래 편집 상태로 돌아온다.",
+      "status": "통과",
+      "result": "분할 영상 0.980~2.957초 선택 재생 끝에서 정지, 원본2.958초 프레임 표시. 새 녹화 파일도 0~2초 재생 후2.000초 정지, 선택 해제 시 양끝0초/음영 제거와 기존 전체19.633초/1조각/재생위치2초 유지.",
+      "evidence": [
+        "tc-screenshots/fixes-20260923/37-selected-range-start.png",
+        "tc-screenshots/fixes-20260923/38-selected-range-end.png",
+        "tc-screenshots/fixes-20260923/56-selection-playing.png",
+        "tc-screenshots/fixes-20260923/57-selection-stopped.png",
+        "tc-screenshots/fixes-20260923/58-selection-cleared.png"
+      ],
+      "previousStatus": "실패",
+      "verificationRun": "fixes-20260923"
+    },
+    {
+      "id": "TC-514",
+      "procedure": "선택 구간 삭제",
+      "expected": "선택 부분이 결과에서 빠지고 전체 길이·경계·프리뷰가 갱신된다.",
+      "status": "부분 확인",
+      "result": "1~2초 삭제 후 73.4→72.4초, 3→4개 클립과 경계 갱신. 결과 내보내기 72.429667초/정상 디코드. 앱 프리뷰의 경계 재생은 미확인.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-514-cut.png",
+        "tc-screenshots/full-tc-20260923/export-probe.json"
+      ],
+      "previousStatus": "부분 확인",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-515",
+      "procedure": "삭제 후 실행 취소/다시 실행",
+      "expected": "구간·총 길이·영상 결과가 각 상태로 정확히 복원된다.",
+      "status": "통과",
+      "result": "0.980~2.957초 삭제: 8초/3조각 → 6.023초/4조각. 실행 취소 8초/3조각/2.957초 복원, 다시 실행 6.023초/4조각/0.980초 복원. 각 상태의 원본 프레임 2.958초 표시 확인.",
+      "evidence": [
+        "tc-screenshots/fixes-20260923/39-delete-frame.png",
+        "tc-screenshots/fixes-20260923/40-delete-undo-frame.png",
+        "tc-screenshots/fixes-20260923/41-delete-redo-frame.png"
+      ],
+      "previousStatus": "실패",
+      "verificationRun": "fixes-20260923"
+    },
+    {
+      "id": "TC-516",
+      "procedure": "영상 중간의 재생 위치에서 나누기",
+      "expected": "두 조각의 시작/끝/길이 합이 원본과 일치한다.",
+      "status": "통과",
+      "result": "8초 영상을 3.979초에서 분할하여 0~3.979 / 3.979~8.000의 합 8초 유지.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-516-split.png"
+      ],
+      "previousStatus": "통과",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-517",
+      "procedure": "여러 번 나누고 조각 이름 수정",
+      "expected": "목록·순서·개별 이름과 시간이 유지된다.",
+      "status": "통과",
+      "result": "첫 조각 이름을 TC 첫 번째 조각으로 변경 후 두 번째 조각을 5.993초에서 추가 분할. 세 조각 이름·순서·경계·전체 8초 유지.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-517-renamed.png",
+        "tc-screenshots/full-tc-20260923/TC-517-multiple.png",
+        "tc-screenshots/full-tc-20260923/TC-524-named-saved.png"
+      ],
+      "previousStatus": "통과",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-518",
+      "procedure": "조각 하나를 저장",
+      "expected": "저장 파일은 지정 구간만 포함하고 영상·소리가 재생된다.",
+      "status": "부분 확인",
+      "result": "3.979~5.993초 조각만 single-clip.mp4로 저장. ffprobe: H264 1280×720 30fps 영상2.000초/AAC2.035333초. 실제 재생 음향 확인은 미완료.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-518-export.png"
+      ],
+      "previousStatus": "부분 확인",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-519",
+      "procedure": "0초 또는 영상 끝에서 나누기",
+      "expected": "빈 조각을 만들지 않고 해당 조작을 제한한다.",
+      "status": "부분 확인",
+      "result": "0초 분할은 오류 안내와 함께 제한됨. 영상 끝 지점 분기는 미확인.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-519-zero.png"
+      ],
+      "previousStatus": "부분 확인",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-520",
+      "procedure": "복수 영상을 추가해 앞/현재 위치/뒤에 각각 삽입",
+      "expected": "타임라인의 순서·총 길이·재생 결과가 선택한 위치와 일치한다.",
+      "status": "부분 확인",
+      "result": "3초 AVI 맨 앞 삽입으로 8→11초 및 앞 순서 확인. 이전 뒤 추가는 73.4초 확인. 현재 위치 삽입은 미검증이며 경계 재생 실패(TC-521).",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-520-front.png",
+        "tc-screenshots/full-tc-20260923/TC-521-stalled.png"
+      ],
+      "previousStatus": "부분 확인",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-521",
+      "procedure": "합친 영상의 경계 전후 재생",
+      "expected": "영상과 음성이 끊기거나 뒤바뀌지 않고 기대한 순서로 이어진다.",
+      "status": "부분 확인",
+      "result": "3초 AVI + 분할 MP4(총11초)를 2.420초부터 재생하여 기존 6.979초 경계 멈춤 없이 11.000초 끝에 도달, 원본 마지막 7.958초 프레임 확인. 음성 경계 청감/무음 간격 정밀 측정은 남음.",
+      "evidence": [
+        "tc-screenshots/fixes-20260923/34-before-mixed-boundary.png",
+        "tc-screenshots/fixes-20260923/35-boundary-play.png",
+        "tc-screenshots/fixes-20260923/36-boundary-progress.png"
+      ],
+      "previousStatus": "실패",
+      "verificationRun": "fixes-20260923"
+    },
+    {
+      "id": "TC-522",
+      "procedure": "서로 다른 해상도/FPS/코덱의 영상 합치기",
+      "expected": "정의된 변환 정책을 적용하거나 지원 불가 이유를 표시한다.",
+      "status": "통과",
+      "result": "320×240 24fps H264/AAC MP4와640×360 25fps MPEG4 무음 AVI를 합쳐 앱에서 내보냄. 결과H2641280×720 30fps/AAC11.021333초, 전체 ffmpeg 디코딩exit0. 변환 정책 일치. 편집 중 경계 재생 결함은TC-521 별도.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-520-front.png",
+        "tc-screenshots/full-tc-20260923/TC-522-complete.png",
+        "tc-screenshots/full-tc-20260923/mixed-probe.json"
+      ],
+      "previousStatus": "통과",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-523",
+      "procedure": "합치기 실행 취소/다시 실행",
+      "expected": "클립 순서·총 길이·재생 위치가 정확히 복원된다.",
+      "status": "통과",
+      "result": "3초 AVI 앞 삽입 전 5.993초. 실행 취소로 8초/3조각/5.993초와 원본 6.000초 프레임 복원. 다시 실행으로 11초/4조각/5.993초 및 원본 MP4 3.000초 프레임 복원(앞 AVI 3초 반영).",
+      "evidence": [
+        "tc-screenshots/fixes-20260923/31-merge-frame.png",
+        "tc-screenshots/fixes-20260923/32-merge-undo-restored.png",
+        "tc-screenshots/fixes-20260923/33-merge-redo-restored.png"
+      ],
+      "previousStatus": "실패",
+      "verificationRun": "fixes-20260923"
+    },
+    {
+      "id": "TC-524",
+      "procedure": "편집 작업 저장 후 앱 재시작·다시 열기",
+      "expected": "원본 참조, 컷·분할·합치기, 이름·순서·선택 상태가 복원된다.",
+      "status": "통과",
+      "result": "앱 재시작 후 저장 작업의 3조각 이름/구간/순서/8초 길이와 선택 0.980~2.957초, 위치 5.993초 복원 확인. 이전 병합 작업도 복원.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-524-named-saved.png",
+        "tc-screenshots/full-tc-20260923/TC-525-fit.png",
+        "tc-screenshots/full-tc-20260923/TC-524-restored.png"
+      ],
+      "previousStatus": "통과",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-525",
+      "procedure": "원본 파일 이동/삭제 후 저장 작업 열기",
+      "expected": "누락 파일을 알리고 다시 연결할 수 있으며 작업 파일 자체는 손상되지 않는다.",
+      "status": "통과",
+      "result": "시험용 원본 이름 변경 후 저장 작업 열기에서 누락 원본 재연결 창 표시. 각 3조각을 이동 파일에 연결하여 이름·경계·총 8초·선택 0.980~2.957초·위치 5.993초 및 영상 복원.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-525-missing.png",
+        "tc-screenshots/full-tc-20260923/TC-525-fit.png"
+      ],
+      "previousStatus": "통과",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-526",
+      "procedure": "결과 영상 내보내기",
+      "expected": "지정 경로에 재생 가능한 파일이 만들어지고 편집 결과·길이·소리가 일치한다.",
+      "status": "부분 확인",
+      "result": "4클립/72.4초 작업 내보내기 성공. H264/AAC 1280x720 30fps 72.429667초, 전체 디코드 오류 없음. 실제 앱 재생·소리 비교는 미완료.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-526-export-complete.png",
+        "tc-screenshots/full-tc-20260923/export-probe.json"
+      ],
+      "previousStatus": "부분 확인",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-527",
+      "procedure": "내보내기 경로 쓰기 불가/파일명 충돌",
+      "expected": "원본 또는 기존 결과를 임의로 덮어쓰지 않고 재선택을 안내한다.",
+      "status": "부분 확인",
+      "result": "기존 single-clip.mp4와 같은 이름으로 내보내기 시 덮어쓰기 확인 창 표시. 아니요 선택으로 경로 선택에 복귀하고 취소함. 쓰기 권한 없는 경로 분기는 미검증.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-527-overwrite-prompt.png",
+        "tc-screenshots/full-tc-20260923/TC-527-declined.png"
+      ],
+      "previousStatus": "부분 확인",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-528",
+      "procedure": "내보내기 중 취소/오류",
+      "expected": "부분 파일 처리 상태를 알리고 저장된 편집 작업을 유지한다.",
+      "status": "부분 확인",
+      "result": "10분 영상 내보내기 중 작업 취소: 취소 안내 및 600초 편집·307.161초 위치 유지. 최종 cancel-export.mp4가 남지 않음. 강제 인코더 오류 분기는 미검증.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-528-exporting.png",
+        "tc-screenshots/full-tc-20260923/TC-528-cancelled.png"
+      ],
+      "previousStatus": "부분 확인",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    },
+    {
+      "id": "TC-529",
+      "procedure": "내보낸 영상을 바로 업로드",
+      "expected": "내보내기 완료 파일만 대상으로 업로드하고 서버 결과와 로컬 결과가 일치한다.",
+      "status": "차단",
+      "result": "완료 파일 cut-export.mp4와 제목이 업로드 화면에 전달됨. 서버 실제 결과 일치는 환경 부재로 확인 불가.",
+      "evidence": [
+        "tc-screenshots/full-tc-20260923/TC-529-handoff.png",
+        "tc-screenshots/full-tc-20260923/TC-308-no-account.png"
+      ],
+      "previousStatus": "차단",
+      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+    }
+  ]
+}
