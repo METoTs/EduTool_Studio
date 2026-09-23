@@ -16,6 +16,11 @@ class QProcess;
 class QComboBox;
 class QTemporaryDir;
 class EduToolTimeline;
+class QSplitter;
+class QDialog;
+class EduToolFileBrowser;
+class QStackedWidget;
+class EduToolStillFrame;
 
 struct EduToolClip {
 	QString path, name;
@@ -33,6 +38,7 @@ public:
 	explicit EduToolEditor(QWidget *parent = nullptr);
 	~EduToolEditor();
 	bool confirmClose();
+	void openFiles(const QStringList &paths) { importFiles(paths, true); }
 signals:
 	void exportReady(const QString &path);
 	void uploadRequested(const QString &path);
@@ -53,13 +59,18 @@ private:
 	QMediaPlayer *player;
 	QAudioOutput *audio;
 	QVideoWidget *video;
+	QStackedWidget *preview;
+	EduToolStillFrame *stillFrame;
+	QSplitter *previewSplitter;
+	QDialog *fullscreen = nullptr;
+	EduToolFileBrowser *browser;
 	QListWidget *list;
 	QLabel *status, *clock;
 	QDoubleSpinBox *start, *end;
 	QSlider *zoom;
 	QComboBox *recent, *insertMode;
 	EduToolTimeline *timeline;
-	QProcess *probe = nullptr, *encoder = nullptr;
+	QProcess *probe = nullptr, *encoder = nullptr, *frameDecoder = nullptr;
 	QStringList importPaths;
 	QJsonObject pendingProject;
 	QVector<EduToolClip> imported;
@@ -67,6 +78,12 @@ private:
 	bool renderingConcat = false, abortExport = false;
 	int activeClip = -1, renderIndex = 0;
 	qint64 position = 0, pendingSeek = 0;
+	bool awaitingMedia = false, applyingSeek = false, pendingPlay = false, transitionPending = false;
+	quint64 seekGeneration = 0;
+	void applyPendingSeek();
+	void renderPausedFrame();
+	void advancePlayback();
+	void toggleFullscreen();
 	QString projectPath, exportPath, errorTail;
 	std::unique_ptr<QTemporaryDir> temporary;
 	QVector<EduToolClip> renderClips;

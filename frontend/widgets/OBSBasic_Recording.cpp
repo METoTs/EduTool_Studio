@@ -19,6 +19,8 @@
 
 #include "OBSBasic.hpp"
 #include "EduToolPortal.hpp"
+#include "EduToolFileBrowser.hpp"
+#include "EduToolEditor.hpp"
 
 #include <components/UIValidation.hpp>
 #include <dialogs/OBSRemux.hpp>
@@ -27,6 +29,8 @@
 
 #include <QDesktopServices>
 #include <QFileInfo>
+#include <QTemporaryFile>
+#include <QDir>
 #include <QProgressDialog>
 #include <QElapsedTimer>
 #include <QFileDialog>
@@ -38,7 +42,7 @@ void OBSBasic::ChangeEduToolRecordingFolder()
 	if (RecordingActive() || eduToolRecordDelayTimer || eduToolRecordingStartPending || IsFFmpegOutputToURL())
 		return;
 	const char *currentPath = GetCurrentOutputPath();
-	const QString path = QFileDialog::getExistingDirectory(this, QStringLiteral("녹화 저장 폴더 선택"),
+	const QString path = EduToolFileBrowser::selectDirectory(this, QStringLiteral("녹화 저장 폴더 선택"),
 		currentPath ? QString::fromUtf8(currentPath) : QString());
 	if (path.isEmpty() || RecordingActive() || eduToolRecordDelayTimer || eduToolRecordingStartPending)
 		return;
@@ -63,9 +67,14 @@ void OBSBasic::on_actionShow_Recordings_triggered()
 				       : config_get_string(activeConfiguration, "AdvOut", "RecFilePath");
 	const char *path = strcmp(mode, "Advanced") ? config_get_string(activeConfiguration, "SimpleOutput", "FilePath")
 						    : adv_path;
-	if (!path || !QFileInfo(QString::fromUtf8(path)).isDir() ||
-	    !QDesktopServices::openUrl(QUrl::fromLocalFile(QString::fromUtf8(path))))
-		ShowEduToolError(QStringLiteral("저장 폴더를 열 수 없습니다. 녹화 저장 위치를 확인하세요."), 3);
+	if (!path || !QFileInfo(QString::fromUtf8(path)).isDir()) {
+		ShowEduToolError(QStringLiteral("저장 폴더를 열 수 없습니다. 녹화 저장 위치를 확인하세요."), 3); return;
+	}
+	const auto files = EduToolFileBrowser::openFiles(this, QStringLiteral("녹화 폴더 — 선택한 영상을 편집에서 열기"), QString::fromUtf8(path));
+	if (!files.isEmpty()) {
+		if (auto *action = findChild<QAction *>("eduToolEditPageAction")) action->trigger();
+		if (auto *editor = findChild<EduToolEditor *>()) editor->openFiles(files);
+	}
 }
 
 #define RECORDING_START "==== Recording Start ==============================================="
@@ -203,6 +212,13 @@ void OBSBasic::StartRecordingImmediately()
 		OutputPathInvalidMessage();
 		return;
 	}
+	if (!IsFFmpegOutputToURL()) {
+		QTemporaryFile probe(QDir(QString::fromUtf8(GetCurrentOutputPath())).filePath(".edutool-write-XXXXXX"));
+		if (!probe.open() || probe.write("test", 4) != 4 || !probe.flush()) {
+			ShowEduToolError(QStringLiteral("녹화 저장 폴더에 쓸 수 없습니다. 저장 위치를 변경하거나 폴더 권한과 여유 공간을 확인하세요."), 3);
+			return;
+		}
+	}
 
 	if (!IsFFmpegOutputToURL() && LowDiskSpace()) {
 		ShowEduToolError(QStringLiteral("녹화 오류: %1").arg(QTStr("Output.RecordNoSpace.Msg")), 3);
@@ -277,6 +293,22 @@ void OBSBasic::RecordingStop(int code, QString last_error)
 							: QTStr("Output.RecordError.Msg");
 		}
 		ShowEduToolError(QStringLiteral("녹화 오류: %1").arg(reason), 3);
+	}
+	if (eduToolClosingRecording) {
+		if (code != OBS_OUTPUT_SUCCESS) {
+			eduToolClosingRecording = false;
+		} else {
+			// The stop signal precedes the output writer's final deactivation.
+			auto *finish = new QTimer(this);
+			connect(finish, &QTimer::timeout, this, [this, finish]() {
+				if (!eduToolClosingRecording) { finish->stop(); finish->deleteLater(); return; }
+				if (RecordingActive()) return;
+				finish->stop(); finish->deleteLater();
+				eduToolClosingRecording = false;
+				close();
+			});
+			finish->start(100);
+		}
 	}
 	ui->statusbar->RecordingStopped();
 	emit RecordingStopped();

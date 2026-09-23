@@ -1,4 +1,7 @@
 #include "EduToolEditor.hpp"
+#include "EduToolFileBrowser.hpp"
+#include <QDialog>
+#include <QSizePolicy>
 #include <QAudioOutput>
 #include <QMediaPlayer>
 #include <QVideoWidget>
@@ -17,6 +20,7 @@
 #include <QBoxLayout>
 #include <QScrollArea>
 #include <QSplitter>
+#include <QStackedWidget>
 #include <QPainter>
 #include <QMouseEvent>
 #include <QMimeData>
@@ -45,6 +49,19 @@ static QString stamp(qint64 ms)
 		.arg(ms / 60000 % 60, 2, 10, QChar('0')).arg(ms / 1000 % 60, 2, 10, QChar('0'))
 		.arg(ms % 1000, 3, 10, QChar('0'));
 }
+
+class EduToolStillFrame : public QWidget {
+public:
+	using QWidget::QWidget;
+	QImage frame;
+protected:
+	void paintEvent(QPaintEvent *) override {
+		QPainter painter(this); painter.fillRect(rect(), Qt::black);
+		if (frame.isNull()) return;
+		const auto size = frame.size().scaled(this->size(), Qt::KeepAspectRatio);
+		painter.drawImage(QRect(QPoint((width() - size.width()) / 2, (height() - size.height()) / 2), size), frame);
+	}
+};
 
 class EduToolTimeline : public QWidget {
 public:
@@ -76,7 +93,7 @@ protected:
 			p.drawText(box.adjusted(8, 2, -4, -2), Qt::AlignVCenter, clip.name);
 			cursor += clip.out - clip.in;
 		}
-		const qint64 step = std::max<qint64>(1000, qint64(100.0 / scale / 1000.0) * 1000);
+		const qint64 step = std::max<qint64>(1000, qint64(std::ceil(115.0 / scale / 1000.0)) * 1000);
 		const QRect visible = visibleRegion().boundingRect();
 		for (qint64 t = (at(visible.left()) / step) * step; t <= std::min(length, at(visible.right()) + step); t += step) {
 			p.setPen(QColor("#bad8ed"));
@@ -114,20 +131,50 @@ EduToolEditor::EduToolEditor(QWidget *parent) : QWidget(parent)
 	auto button = [this](QBoxLayout *row, const QString &text, auto callback) {
 		auto *b = new QPushButton(text, this); row->addWidget(b); connect(b, &QPushButton::clicked, this, callback); return b;
 	};
-	button(tools, QStringLiteral("새 영상 열기"), [this]() { importFiles(QFileDialog::getOpenFileNames(this, QStringLiteral("영상 열기")), true); });
-	button(tools, QStringLiteral("영상 추가"), [this]() { importFiles(QFileDialog::getOpenFileNames(this, QStringLiteral("영상 추가")), false); });
+	button(tools, QStringLiteral("새 영상 열기"), [this]() { importFiles(EduToolFileBrowser::openFiles(this, QStringLiteral("영상 열기")), true); });
+	button(tools, QStringLiteral("영상 추가"), [this]() { importFiles(EduToolFileBrowser::openFiles(this, QStringLiteral("영상 추가")), false); });
 	insertMode = new QComboBox(this);
 	insertMode->addItems({QStringLiteral("맨 뒤에 추가"), QStringLiteral("맨 앞에 추가"), QStringLiteral("현재 재생 위치에 추가")});
 	tools->addWidget(insertMode);
 	recent = new QComboBox(this); recent->addItem(QStringLiteral("최근 영상"));
 	for (const auto &path : QSettings("EduTool", "Studio").value("editor/recent").toStringList()) recent->addItem(path, path);
+	recent->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon); recent->setMinimumContentsLength(10);
 	tools->addWidget(recent, 1);
-	connect(recent, &QComboBox::activated, this, [this](int i) { if (i > 0) importFiles({recent->itemData(i).toString()}, true); });
-	auto *splitter = new QSplitter(this);
+	connect(recent, &QComboBox::activated, this, [this](int i) {
+		if (i <= 0) return;
+		QString path = recent->itemData(i).toString();
+		if (!QFileInfo(path).isFile()) {
+			QMessageBox message(QMessageBox::Warning, QStringLiteral("최근 영상 없음"), QStringLiteral("파일이 이동되었거나 삭제되었습니다.\n%1").arg(path), QMessageBox::Cancel, this);
+			auto *locate = message.addButton(QStringLiteral("위치 찾기"), QMessageBox::ActionRole);
+			auto *remove = message.addButton(QStringLiteral("목록에서 제거"), QMessageBox::ActionRole);
+			message.exec();
+			if (message.clickedButton() == remove) {
+				QSettings settings("EduTool", "Studio"); auto paths = settings.value("editor/recent").toStringList(); paths.removeAll(path); settings.setValue("editor/recent", paths); recent->removeItem(i); return;
+			}
+			if (message.clickedButton() != locate) return;
+			const auto paths = EduToolFileBrowser::openFiles(this, QStringLiteral("이동한 영상 찾기"));
+			if (paths.isEmpty()) return;
+			path = paths.first();
+		}
+		importFiles({path}, true);
+	});
+	auto *splitter = new QSplitter(this); previewSplitter = splitter;
+	browser = new EduToolFileBrowser(splitter); browser->setMinimumWidth(220); browser->setMaximumWidth(400); browser->hide();
+	button(tools, QStringLiteral("파일 탐색기"), [this]() {
+		browser->setVisible(!browser->isVisible());
+		if (browser->isVisible()) previewSplitter->setSizes({300, 650, 250});
+	});
+	button(tools, QStringLiteral("선택 파일 추가"), [this]() { importFiles(browser->selectedFiles(), clips.isEmpty()); });
+	connect(browser, &EduToolFileBrowser::filesActivated, this, [this](const QStringList &paths) { importFiles(paths, clips.isEmpty()); });
 	layout->addWidget(splitter, 1);
-	video = new QVideoWidget(splitter); video->setMinimumSize(240, 135);
-	list = new QListWidget(splitter); list->setMinimumWidth(170);
-	splitter->setStretchFactor(0, 4); splitter->setStretchFactor(1, 1);
+	preview = new QStackedWidget(splitter); preview->setMinimumSize(240, 135);
+	preview->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
+	video = new QVideoWidget(preview); preview->addWidget(video);
+	video->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
+	stillFrame = new EduToolStillFrame(preview); preview->addWidget(stillFrame);
+	list = new QListWidget(splitter); list->setMinimumWidth(200); list->setWordWrap(true); list->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+	splitter->setStretchFactor(0, 0); splitter->setStretchFactor(1, 4); splitter->setStretchFactor(2, 1);
+	QTimer::singleShot(0, this, [splitter]() { splitter->setSizes({0, 900, 250}); });
 	player = new QMediaPlayer(this); audio = new QAudioOutput(this); audio->setVolume(0.7f);
 	player->setAudioOutput(audio); player->setVideoOutput(video);
 	connect(video->videoSink(), &QVideoSink::videoFrameChanged, this, [this](const QVideoFrame &frame) {
@@ -137,14 +184,14 @@ EduToolEditor::EduToolEditor(QWidget *parent) : QWidget(parent)
 			timeline->update();
 		}
 	});
-	auto *escape = new QShortcut(QKeySequence(Qt::Key_Escape), video);
-	connect(escape, &QShortcut::activated, video, [this]() { video->setFullScreen(false); });
+	auto *escape = new QShortcut(QKeySequence(Qt::Key_Escape), preview);
+	connect(escape, &QShortcut::activated, preview, [this]() { if (fullscreen) fullscreen->reject(); });
 	auto *playback = new QHBoxLayout; layout->addLayout(playback);
 	button(playback, QStringLiteral("재생 / 일시정지"), [this]() {
-		if (player->playbackState() == QMediaPlayer::PlayingState) player->pause();
+		if (pendingPlay) { pendingPlay = false; player->pause(); }
 		else { selectionPlayback = false; seek(position >= total() ? 0 : position, true); }
 	});
-	button(playback, QStringLiteral("전체화면"), [this]() { video->setFullScreen(!video->isFullScreen()); });
+	button(playback, QStringLiteral("전체화면"), [this]() { toggleFullscreen(); });
 	auto *volume = new QSlider(Qt::Horizontal, this); volume->setRange(0, 100); volume->setValue(70); volume->setMaximumWidth(130);
 	volume->setAccessibleName(QStringLiteral("편집 미리보기 볼륨")); playback->addWidget(volume);
 	connect(volume, &QSlider::valueChanged, this, [this](int v) { audio->setVolume(v / 100.0f); });
@@ -153,7 +200,8 @@ EduToolEditor::EduToolEditor(QWidget *parent) : QWidget(parent)
 	timeline = new EduToolTimeline(scroll); timeline->resize(800, 112); scroll->setWidget(timeline); layout->addWidget(scroll);
 	timeline->scrub = [this](qint64 p) { selectionPlayback = false; seek(p); };
 	timeline->selection = [this](qint64 a, qint64 b) { start->setValue(a / 1000.0); end->setValue(b / 1000.0); };
-	auto *edits = new QHBoxLayout; layout->addLayout(edits);
+	auto *selectionRow = new QHBoxLayout; layout->addLayout(selectionRow);
+	auto *edits = selectionRow;
 	start = new QDoubleSpinBox(this); end = new QDoubleSpinBox(this);
 	for (auto *spin : {start, end}) { spin->setDecimals(3); spin->setSuffix(QStringLiteral(" 초")); edits->addWidget(spin); }
 	start->setAccessibleName(QStringLiteral("선택 시작")); end->setAccessibleName(QStringLiteral("선택 끝"));
@@ -165,6 +213,7 @@ EduToolEditor::EduToolEditor(QWidget *parent) : QWidget(parent)
 		selectionPlayback = true; seek(qint64(start->value() * 1000), true);
 	});
 	button(edits, QStringLiteral("선택 해제"), [this]() { selectionPlayback = false; start->setValue(0); end->setValue(0); });
+	auto *editRow = new QHBoxLayout; layout->addLayout(editRow); edits = editRow;
 	button(edits, QStringLiteral("구간 삭제"), [this]() { removeSelection(); });
 	button(edits, QStringLiteral("나누기"), [this]() { split(); });
 	button(edits, QStringLiteral("실행 취소"), [this]() { if (!undo.isEmpty() && !exporting && !importing) { redo.push_back(snapshot()); restore(undo.takeLast()); } });
@@ -177,6 +226,7 @@ EduToolEditor::EduToolEditor(QWidget *parent) : QWidget(parent)
 	button(bottom, QStringLiteral("전체 보기"), [this, resizeTimeline]() { zoom->setValue(1); resizeTimeline(); });
 	button(bottom, QStringLiteral("작업 열기"), [this]() { loadProject(); });
 	button(bottom, QStringLiteral("작업 저장"), [this]() { saveProject(); });
+	auto *exportRow = new QHBoxLayout; layout->addLayout(exportRow); bottom = exportRow;
 	button(bottom, QStringLiteral("조각 저장"), [this]() { exportVideo(true); });
 	button(bottom, QStringLiteral("영상 내보내기"), [this]() { exportVideo(false); });
 	button(bottom, QStringLiteral("완료 영상 업로드"), [this]() {
@@ -204,21 +254,22 @@ EduToolEditor::EduToolEditor(QWidget *parent) : QWidget(parent)
 		if (target >= 0 && target < clips.size() && target != index) { checkpoint(); clips.swapItemsAt(index, target); refresh(); list->setCurrentRow(target); }
 	});
 	connect(player, &QMediaPlayer::mediaStatusChanged, this, [this](QMediaPlayer::MediaStatus state) {
-		if (state == QMediaPlayer::LoadedMedia) player->setPosition(pendingSeek);
-		if (state == QMediaPlayer::EndOfMedia && activeClip >= 0) {
-			qint64 next = 0; for (int i = 0; i <= activeClip; ++i) next += clips[i].out - clips[i].in;
-			if (selectionPlayback && next >= qint64(end->value() * 1000)) { player->pause(); selectionPlayback = false; }
-			else if (next < total()) seek(next, true);
+		if (awaitingMedia && (state == QMediaPlayer::LoadedMedia || state == QMediaPlayer::BufferedMedia)) {
+			awaitingMedia = false;
+			applyPendingSeek();
 		}
+		else if (state == QMediaPlayer::EndOfMedia && pendingPlay && !awaitingMedia && !applyingSeek) advancePlayback();
 	});
 	connect(player, &QMediaPlayer::positionChanged, this, [this](qint64 p) {
-		if (activeClip < 0 || activeClip >= clips.size()) return;
+		if (!pendingPlay || awaitingMedia || applyingSeek || transitionPending || activeClip < 0 || activeClip >= clips.size()) return;
 		qint64 base = 0; for (int i = 0; i < activeClip; ++i) base += clips[i].out - clips[i].in;
 		position = std::clamp(base + p - clips[activeClip].in, qint64(0), total());
 		timeline->position = position; timeline->update(); clock->setText(stamp(position) + " / " + stamp(total()));
-		if (player->playbackState() != QMediaPlayer::PlayingState) return;
-		if (selectionPlayback && position >= qint64(end->value() * 1000)) { player->pause(); selectionPlayback = false; return; }
-		if (p >= clips[activeClip].out) { if (base + clips[activeClip].out - clips[activeClip].in < total()) seek(base + clips[activeClip].out - clips[activeClip].in, true); else player->pause(); }
+		if (!pendingPlay || player->playbackState() != QMediaPlayer::PlayingState) return;
+		if (selectionPlayback && position >= qint64(end->value() * 1000)) {
+			selectionPlayback = false; seek(qint64(end->value() * 1000)); return;
+		}
+		if (p >= clips[activeClip].out) advancePlayback();
 	});
 	connect(player, &QMediaPlayer::errorOccurred, this, [this](QMediaPlayer::Error, const QString &message) { showError(QStringLiteral("미리보기 재생 실패: %1").arg(message)); });
 	QTimer::singleShot(0, this, resizeTimeline); refresh();
@@ -226,7 +277,7 @@ EduToolEditor::EduToolEditor(QWidget *parent) : QWidget(parent)
 
 EduToolEditor::~EduToolEditor()
 {
-	for (auto *process : {probe, encoder}) if (process) { process->disconnect(this); process->kill(); process->waitForFinished(3000); }
+	for (auto *process : {probe, encoder, frameDecoder}) if (process) { process->disconnect(this); process->kill(); process->waitForFinished(3000); }
 }
 qint64 EduToolEditor::total() const { qint64 result = 0; for (const auto &c : clips) result += c.out - c.in; return result; }
 QString EduToolEditor::tool(const QString &name) const
@@ -256,24 +307,98 @@ void EduToolEditor::restore(const EditState &state)
 void EduToolEditor::checkpoint() { undo.push_back(snapshot()); if (undo.size() > 100) undo.removeFirst(); redo.clear(); dirty = true; player->pause(); }
 void EduToolEditor::refresh()
 {
-	player->pause(); activeClip = -1; list->clear();
-	for (const auto &c : clips) list->addItem(QStringLiteral("%1\n%2 — %3 · %4×%5 · %6 FPS\n%7 MB").arg(c.name, stamp(c.in), stamp(c.out)).arg(c.width).arg(c.height).arg(c.fps, 0, 'f', 2).arg(QFileInfo(c.path).size() / (1024.0 * 1024.0), 0, 'f', 1));
+	pendingPlay = false; player->pause(); list->clear();
+	for (const auto &c : clips) list->addItem(QStringLiteral("%1\n%2 — %3\n%4×%5 · %6 FPS · %7 MB").arg(c.name, stamp(c.in), stamp(c.out)).arg(c.width).arg(c.height).arg(c.fps, 0, 'f', 2).arg(QFileInfo(c.path).size() / (1024.0 * 1024.0), 0, 'f', 1));
 	start->setMaximum(total() / 1000.0); end->setMaximum(total() / 1000.0);
 	timeline->clips = clips; timeline->length = total(); timeline->update(); seek(std::min(position, total()));
 }
+void EduToolEditor::applyPendingSeek()
+{
+	applyingSeek = true;
+	if (!pendingPlay) player->pause();
+	player->setPosition(pendingSeek);
+	if (pendingPlay) player->play();
+	applyingSeek = false;
+}
 void EduToolEditor::seek(qint64 milliseconds, bool play)
 {
-	if (clips.isEmpty()) { player->stop(); player->setSource(QUrl()); position = 0; clock->setText(stamp(0)); return; }
-	position = std::clamp(milliseconds, qint64(0), total() - 1);
+	++seekGeneration; transitionPending = false; pendingPlay = play;
+	if (clips.isEmpty()) {
+		applyingSeek = true; activeClip = -1; awaitingMedia = false; player->stop(); player->setSource(QUrl()); applyingSeek = false;
+		stillFrame->frame = {}; stillFrame->update(); preview->setCurrentWidget(stillFrame);
+		position = 0; clock->setText(stamp(0)); return;
+	}
+	position = std::clamp(milliseconds, qint64(0), total());
 	qint64 base = 0; int index = 0;
 	while (index + 1 < clips.size() && position >= base + clips[index].out - clips[index].in) { base += clips[index].out - clips[index].in; ++index; }
-	pendingSeek = clips[index].in + position - base;
-	if (activeClip != index || player->source() != QUrl::fromLocalFile(clips[index].path)) {
-		activeClip = index; player->setSource(QUrl::fromLocalFile(clips[index].path));
-	}
-	player->setPosition(pendingSeek); timeline->position = position; timeline->update();
-	clock->setText(stamp(position) + " / " + stamp(total()));
-	if (play) player->play(); else player->pause();
+	pendingSeek = std::min(clips[index].out - 1, clips[index].in + position - base);
+	activeClip = index;
+	if (play) preview->setCurrentWidget(video); else renderPausedFrame();
+	const auto source = QUrl::fromLocalFile(clips[index].path);
+	if (player->source() != source) {
+		awaitingMedia = true; player->setSource(source);
+	} else if (!awaitingMedia) applyPendingSeek();
+	timeline->position = position; timeline->update(); clock->setText(stamp(position) + " / " + stamp(total()));
+}
+void EduToolEditor::renderPausedFrame()
+{
+	const auto generation = seekGeneration;
+	const auto path = clips[activeClip].path;
+	const double fps = clips[activeClip].fps > 0 ? clips[activeClip].fps : 30;
+	const auto offset = std::max(qint64(0), std::min(pendingSeek, clips[activeClip].duration - qint64(std::ceil(1000 / fps))));
+	stillFrame->frame = {}; stillFrame->update(); preview->setCurrentWidget(stillFrame);
+	QTimer::singleShot(60, this, [this, generation, path, offset]() {
+		if (generation != seekGeneration || pendingPlay) return;
+		if (frameDecoder) {
+			frameDecoder->disconnect(this); frameDecoder->kill();
+			connect(frameDecoder, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), frameDecoder, &QObject::deleteLater);
+		}
+		auto *process = new QProcess(this); frameDecoder = process;
+		connect(process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this, [this, process, generation](int code, QProcess::ExitStatus exit) {
+			const auto frame = QImage::fromData(process->readAllStandardOutput(), "PNG");
+			if (frameDecoder == process) frameDecoder = nullptr;
+			process->deleteLater();
+			if (generation != seekGeneration || pendingPlay) return;
+			if (code || exit != QProcess::NormalExit || frame.isNull()) { showError(QStringLiteral("해당 위치의 영상 프레임을 읽을 수 없습니다.")); return; }
+			stillFrame->frame = frame; stillFrame->update();
+		});
+		connect(process, &QProcess::errorOccurred, this, [this, process, generation](QProcess::ProcessError error) {
+			if (error != QProcess::FailedToStart) return;
+			if (frameDecoder == process) frameDecoder = nullptr;
+			process->deleteLater();
+			if (generation == seekGeneration) showError(QStringLiteral("정지 미리보기 디코더를 실행할 수 없습니다."));
+		});
+		process->start(tool("ffmpeg"), {"-nostdin", "-v", "error", "-ss", QString::number(offset / 1000.0, 'f', 3), "-i", path,
+			"-map", "0:v:0", "-frames:v", "1", "-vf", "scale=1280:720:force_original_aspect_ratio=decrease", "-f", "image2pipe", "-c:v", "png", "pipe:1"});
+		QTimer::singleShot(10000, process, [process]() { if (process->state() != QProcess::NotRunning) process->kill(); });
+	});
+}
+void EduToolEditor::advancePlayback()
+{
+	if (transitionPending || activeClip < 0 || activeClip >= clips.size()) return;
+	qint64 next = 0; for (int i = 0; i <= activeClip; ++i) next += clips[i].out - clips[i].in;
+	transitionPending = true; const auto generation = seekGeneration;
+	QTimer::singleShot(0, this, [this, next, generation]() {
+		if (generation != seekGeneration) return;
+		if (selectionPlayback && next >= qint64(end->value() * 1000)) { selectionPlayback = false; seek(qint64(end->value() * 1000)); }
+		else seek(next, next < total());
+	});
+}
+void EduToolEditor::toggleFullscreen()
+{
+	if (fullscreen) { fullscreen->reject(); return; }
+	const auto sizes = previewSplitter->sizes();
+	auto *dialog = new QDialog(this); fullscreen = dialog;
+	dialog->setWindowTitle(QStringLiteral("편집 미리보기 — Esc로 돌아가기"));
+	auto *layout = new QVBoxLayout(dialog); layout->setContentsMargins(0, 0, 0, 0);
+	layout->addWidget(preview);
+	auto *back = new QPushButton(QStringLiteral("편집 화면으로 돌아가기 (Esc)"), dialog); layout->addWidget(back);
+	connect(back, &QPushButton::clicked, dialog, &QDialog::reject);
+	connect(dialog, &QDialog::finished, this, [this, dialog, sizes]() {
+		previewSplitter->insertWidget(1, preview); preview->show(); previewSplitter->setSizes(sizes);
+		fullscreen = nullptr; dialog->deleteLater();
+	});
+	dialog->showFullScreen();
 }
 void EduToolEditor::dragEnterEvent(QDragEnterEvent *e) { if (e->mimeData()->hasUrls() && !importing && !exporting) e->acceptProposedAction(); }
 void EduToolEditor::dropEvent(QDropEvent *e)
@@ -404,7 +529,7 @@ void EduToolEditor::removeSelection()
 void EduToolEditor::saveProject()
 {
 	if (importing || exporting) return;
-	const auto path = QFileDialog::getSaveFileName(this, QStringLiteral("편집 작업 저장"), projectPath, QStringLiteral("EduTool 작업 (*.edutool.json)"));
+	const auto path = EduToolFileBrowser::saveFile(this, QStringLiteral("편집 작업 저장"), projectPath, ".edutool.json");
 	if (path.isEmpty()) return;
 	for (const auto &clip : clips) if (!QFileInfo(path).canonicalFilePath().isEmpty() &&
 		QFileInfo(path).canonicalFilePath().compare(QFileInfo(clip.path).canonicalFilePath(), Qt::CaseInsensitive) == 0) {
@@ -418,7 +543,7 @@ void EduToolEditor::saveProject()
 void EduToolEditor::loadProject()
 {
 	if (importing || exporting || !confirmClose()) return;
-	const auto path = QFileDialog::getOpenFileName(this, QStringLiteral("편집 작업 열기"), {}, QStringLiteral("EduTool 작업 (*.json)")); if (path.isEmpty()) return;
+	const auto path = EduToolFileBrowser::openFiles(this, QStringLiteral("편집 작업 열기"), {}, true).value(0); if (path.isEmpty()) return;
 	QFile file(path); if (!file.open(QIODevice::ReadOnly) || file.size() > 8 * 1024 * 1024) { showError(QStringLiteral("작업 파일을 읽을 수 없습니다.")); return; }
 	auto object = QJsonDocument::fromJson(file.readAll()).object(); QJsonArray restored; QStringList paths; bool relinked = false;
 	if (object["version"].toInt() != 1 || !object["clips"].isArray()) { showError(QStringLiteral("지원하지 않는 작업 파일입니다.")); return; }
@@ -430,7 +555,7 @@ void EduToolEditor::loadProject()
 		auto c = EduToolClip::fromJson(value.toObject());
 		if (c.in < 0 || c.out <= c.in || c.out > c.duration || c.duration > 604800000 || c.width <= 0 || c.height <= 0) { showError(QStringLiteral("손상된 구간 정보입니다.")); return; }
 		if (!QFileInfo(c.path).isFile()) {
-			c.path = QFileDialog::getOpenFileName(this, QStringLiteral("누락 원본 다시 연결: %1").arg(c.name));
+			c.path = EduToolFileBrowser::openFiles(this, QStringLiteral("누락 원본 다시 연결: %1").arg(c.name)).value(0);
 			if (c.path.isEmpty()) { showError(QStringLiteral("다시 연결을 취소했습니다. 기존 작업을 유지합니다.")); return; }
 			relinked = true;
 		}
@@ -445,7 +570,7 @@ void EduToolEditor::exportVideo(bool selectedOnly)
 	if (tool("ffmpeg").isEmpty()) { showError(QStringLiteral("ffmpeg 도구가 설치되어 있지 않습니다.")); return; }
 	renderClips = clips;
 	if (selectedOnly) { const int row = list->currentRow(); if (row < 0) { showError(QStringLiteral("저장할 조각을 목록에서 선택하세요.")); return; } renderClips = {clips[row]}; }
-	exportPath = QFileDialog::getSaveFileName(this, QStringLiteral("영상 내보내기 — 1280×720, 30 FPS, H.264/AAC"), {}, QStringLiteral("MP4 영상 (*.mp4)"));
+	exportPath = EduToolFileBrowser::saveFile(this, QStringLiteral("영상 내보내기 — 1280×720, 30 FPS, H.264/AAC"), {}, ".mp4");
 	if (exportPath.isEmpty()) return;
 	if (!exportPath.endsWith(".mp4", Qt::CaseInsensitive)) exportPath += ".mp4";
 	if (QFileInfo::exists(exportPath)) { showError(QStringLiteral("기존 파일을 덮어쓰지 않습니다. 새 이름을 선택하세요.")); return; }

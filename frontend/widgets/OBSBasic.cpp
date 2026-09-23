@@ -450,8 +450,11 @@ OBSBasic::OBSBasic(QWidget *parent) : OBSMainWindow(parent), undo_s(ui), ui(new 
 	auto *recordPageAction = addFeatureAction(QStringLiteral("녹화"));
 	recordPageAction->setObjectName(QStringLiteral("eduToolRecordPageAction"));
 	auto *livePageAction = addFeatureAction(QStringLiteral("라이브 방송"));
+	livePageAction->setObjectName("eduToolLivePageAction");
 	auto *editPageAction = addFeatureAction(QStringLiteral("편집"));
+	editPageAction->setObjectName("eduToolEditPageAction");
 	auto *uploadPageAction = addFeatureAction(QStringLiteral("업로드"));
+	uploadPageAction->setObjectName("eduToolUploadPageAction");
 	recordPageAction->setChecked(true);
 	featureBar->addSeparator();
 	auto *recordSettingsAction = featureBar->addAction(QStringLiteral("녹화 세부 설정"));
@@ -668,7 +671,7 @@ OBSBasic::OBSBasic(QWidget *parent) : OBSMainWindow(parent), undo_s(ui), ui(new 
 		if (leavingPreview) {
 			dockVisibility->clear();
 			for (auto *dock : findChildren<QDockWidget *>(QString(), Qt::FindDirectChildrenOnly)) {
-				dockVisibility->append(qMakePair(dock, dock->isVisible()));
+				dockVisibility->append(qMakePair(dock, !dock->isHidden()));
 				dock->hide();
 			}
 		}
@@ -678,6 +681,7 @@ OBSBasic::OBSBasic(QWidget *parent) : OBSMainWindow(parent), undo_s(ui), ui(new 
 				dock->setVisible(wasVisible);
 			}
 		}
+		if (page == 0) controlsDock->show();
 		recordSettingsAction->setVisible(recording);
 		liveSettingsAction->setVisible(live);
 		previewBar->setVisible(recording || live);
@@ -698,10 +702,6 @@ OBSBasic::OBSBasic(QWidget *parent) : OBSMainWindow(parent), undo_s(ui), ui(new 
 	auto *accountAction = featureBar->addAction(QStringLiteral("로그인"));
 	connect(accountAction, &QAction::triggered, uploadPageAction, &QAction::trigger);
 	connect(portal, &EduToolPortal::accountChanged, accountAction, &QAction::setText);
-	QTimer::singleShot(0, this, [recordPageAction, livePageAction, editPageAction, uploadPageAction]() {
-		const QString mode = QString::fromUtf8(config_get_string(App()->GetUserConfig(), "EduTool", "LastFeature"));
-		(mode == "live" ? livePageAction : mode == "edit" ? editPageAction : mode == "upload" ? uploadPageAction : recordPageAction)->trigger();
-	});
 
 	auto updateActivityStatus = [this, activityStatus, panelActivityStatus]() {
 		const bool recording = RecordingActive();
@@ -1621,6 +1621,13 @@ void OBSBasic::OBSInit()
 		}
 	}
 
+	// Restore the feature only after OBS has restored the saved dock layout.
+	QTimer::singleShot(0, this, [this]() {
+		const QString mode = QString::fromUtf8(config_get_string(App()->GetUserConfig(), "EduTool", "LastFeature"));
+		const QString actionName = mode == "edit" ? "eduToolEditPageAction" : mode == "upload" ? "eduToolUploadPageAction" : mode == "live" ? "eduToolLivePageAction" : "eduToolRecordPageAction";
+		if (auto *action = findChild<QAction *>(actionName)) action->trigger();
+	});
+
 	bool pre23Defaults = config_get_bool(App()->GetUserConfig(), "General", "Pre23Defaults");
 	if (pre23Defaults) {
 		bool resetDockLock23 = config_get_bool(App()->GetUserConfig(), "General", "ResetDockLock23");
@@ -2416,6 +2423,8 @@ void OBSBasic::close()
 
 void OBSBasic::closeEvent(QCloseEvent *event)
 {
+	if (eduToolClosingRecording) { event->ignore(); return; }
+
 	if (auto *editor = findChild<EduToolEditor *>(); editor && !editor->confirmClose()) {
 		event->ignore();
 		return;
@@ -2444,6 +2453,19 @@ void OBSBasic::closeEvent(QCloseEvent *event)
 		event->ignore();
 		restart = false;
 
+		return;
+	}
+
+	if (RecordingActive()) {
+		event->ignore();
+		if (!promptToClose()) return;
+		eduToolClosingRecording = true;
+		StopRecording();
+		QTimer::singleShot(30000, this, [this]() {
+			if (!eduToolClosingRecording) return;
+			eduToolClosingRecording = false;
+			ShowEduToolError(QStringLiteral("녹화 종료가 지연되고 있습니다. 파일 저장 상태를 확인한 후 다시 종료하세요."), 3);
+		});
 		return;
 	}
 

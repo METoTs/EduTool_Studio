@@ -1006,6 +1006,7 @@ private:
 	QPointer<QTimer> diskFullTimer;
 	QPointer<QTimer> eduToolRecordDelayTimer;
 	bool eduToolRecordingStartPending = false;
+	bool eduToolClosingRecording = false;
 	bool recordingStopping = false;
 	bool recordingStarted = false;
 	bool isRecordingPausable = false;

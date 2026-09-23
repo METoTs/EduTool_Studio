@@ -14,6 +14,8 @@ target_sources(
     widgets/AudioMixer.hpp
     widgets/EduToolEditor.cpp
     widgets/EduToolEditor.hpp
+    widgets/EduToolFileBrowser.cpp
+    widgets/EduToolFileBrowser.hpp
     widgets/EduToolPortal.cpp
     widgets/EduToolPortal.hpp
     widgets/ColorSelect.cpp
