@@ -377,7 +377,10 @@ void EduToolEditor::renderPausedFrame()
 	const auto generation = seekGeneration;
 	const auto path = clips[activeClip].path;
 	const double fps = clips[activeClip].fps > 0 ? clips[activeClip].fps : 30;
-	const auto offset = std::max(qint64(0), std::min(pendingSeek, clips[activeClip].duration - qint64(std::ceil(1000 / fps))));
+	// Container duration can include an audio tail beyond the last video frame.
+	const auto &clip = clips[activeClip];
+	const auto videoEnd = clip.videoDuration > 0 ? clip.videoDuration : clip.duration;
+	const auto offset = std::max(qint64(0), std::min(pendingSeek, videoEnd - qint64(std::ceil(1000 / fps))));
 	stillFrame->frame = {}; stillFrame->update(); preview->setCurrentWidget(stillFrame);
 	QTimer::singleShot(60, this, [this, generation, path, offset]() {
 		if (generation != seekGeneration || pendingPlay) return;
@@ -509,6 +512,9 @@ void EduToolEditor::probeNext()
 			const auto stream = value.toObject();
 			if (stream["codec_type"] == "audio") clip.audio = true;
 			if (stream["codec_type"] == "video" && !clip.width) {
+				const double videoSeconds = stream["duration"].toString().toDouble();
+				if (std::isfinite(videoSeconds) && videoSeconds > 0 && videoSeconds < 604800)
+					clip.videoDuration = qint64(videoSeconds * 1000);
 				clip.width = stream["width"].toInt(); clip.height = stream["height"].toInt();
 				const auto rate = stream["avg_frame_rate"].toString().split('/');
 				if (rate.size() == 2 && rate[1].toDouble() > 0) clip.fps = rate[0].toDouble() / rate[1].toDouble();
@@ -527,7 +533,7 @@ void EduToolEditor::probeNext()
 		decoder->start(tool("ffmpeg"), {"-nostdin", "-v", "error", "-i", clip.path, "-map", "0:v:0", "-frames:v", "1", "-vf", "scale=160:-2", "-f", "image2pipe", "-c:v", "png", "pipe:1"});
 		QTimer::singleShot(30000, decoder, [this, decoder]() { if (probe == decoder && decoder->state() != QProcess::NotRunning) importFailed(QStringLiteral("프레임 가져오기 시간이 초과되었습니다.")); });
 	});
-	process->start(tool("ffprobe"), {"-v", "error", "-show_entries", "format=duration:stream=codec_type,width,height,avg_frame_rate", "-of", "json", path});
+	process->start(tool("ffprobe"), {"-v", "error", "-show_entries", "format=duration:stream=codec_type,width,height,avg_frame_rate,duration", "-of", "json", path});
 	QTimer::singleShot(30000, process, [this, process]() { if (probe == process && process->state() != QProcess::NotRunning) importFailed(QStringLiteral("영상 분석 시간이 초과되었습니다.")); });
 }
 void EduToolEditor::split()

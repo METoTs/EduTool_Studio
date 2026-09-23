@@ -28,6 +28,7 @@ struct EduToolClip {
 	int width = 0, height = 0;
 	double fps = 0;
 	bool audio = false;
+	qint64 videoDuration = 0;
 	QJsonObject json() const;
 	static EduToolClip fromJson(const QJsonObject &json);
 };

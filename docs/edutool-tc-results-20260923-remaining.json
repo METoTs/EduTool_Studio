@@ -4,8 +4,8 @@
   "baseline": "docs/edutool-tc-results-20260923-after-recheck.json",
   "scope": "Computer Use 실제 실행 재검증. 누적 판정이며 전체97건을 이번에 재실행한 것은 아님.",
   "counts": {
-    "통과": 47,
-    "부분 확인": 15,
+    "통과": 48,
+    "부분 확인": 14,
     "기존 통과": 4,
     "차단": 31
   },
@@ -1218,14 +1218,24 @@
       "id": "TC-526",
       "procedure": "결과 영상 내보내기",
       "expected": "지정 경로에 재생 가능한 파일이 만들어지고 편집 결과·길이·소리가 일치한다.",
-      "status": "부분 확인",
-      "result": "4클립/72.4초 작업 내보내기 성공. H264/AAC 1280x720 30fps 72.429667초, 전체 디코드 오류 없음. 실제 앱 재생·소리 비교는 미완료.",
+      "status": "통과",
+      "result": "3클립 11초 작업을 UI에서 내보내고 다시 열어 끝까지 재생. 출력 11.021333초, 3/5/9초 프레임이 원본→파랑→원본 순서로 일치. 디코딩한 PCM의 유음/무음 구간과 RMS 확인. 재생 종료 검은 화면 결함 수정 후 원본 마지막 7.958초 프레임 유지 확인. 파일 오디오 신호 검증이며 물리 스피커 청음은 별도 미수행.",
       "evidence": [
         "tc-screenshots/full-tc-20260923/TC-526-export-complete.png",
-        "tc-screenshots/full-tc-20260923/export-probe.json"
+        "tc-screenshots/full-tc-20260923/export-probe.json",
+        "tc-screenshots/remaining-tc-20260923/59-merged-export-complete.png",
+        "tc-screenshots/remaining-tc-20260923/merged-probe.json",
+        "tc-screenshots/remaining-tc-20260923/merged-audio-analysis.json",
+        "tc-screenshots/remaining-tc-20260923/merged-frame-3.png",
+        "tc-screenshots/remaining-tc-20260923/merged-frame-5.png",
+        "tc-screenshots/remaining-tc-20260923/merged-frame-9.png",
+        "tc-screenshots/remaining-tc-20260923/62-merged-reopened.png",
+        "tc-screenshots/remaining-tc-20260923/64-merged-play-progress.png",
+        "tc-screenshots/remaining-tc-20260923/65-merged-play-end.png",
+        "tc-screenshots/remaining-tc-20260923/66-merged-end-fixed.png"
       ],
       "previousStatus": "부분 확인",
-      "verificationRun": "full-tc-20260923 (이번 미재시험)"
+      "verificationRun": "remaining-tc-20260923"
     },
     {
       "id": "TC-527",
@@ -1423,11 +1433,11 @@
   ],
   "metrics": {
     "total": 97,
-    "passed": 51,
+    "passed": 52,
     "excluded": 37,
     "eligible": 60,
-    "allRate": 52.6,
-    "eligibleRate": 85
+    "allRate": 53.6,
+    "eligibleRate": 86.7
   },
   "improvements": {
     "IMP-01": {
