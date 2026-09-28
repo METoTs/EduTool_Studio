@@ -988,7 +988,14 @@ bool OBSApp::SetTheme(const QString &name)
 		}
 	}
 
-	const QString stylesheet = PrepareQSS(vars, contents);
+	QString stylesheet = PrepareQSS(vars, contents);
+	// Keep the product shell independent of external OBS theme files and saved theme choices.
+	QFile eduToolStyle(QStringLiteral(":/res/edutool.qss"));
+	if (eduToolStyle.open(QIODeviceBase::ReadOnly)) {
+		stylesheet += QLatin1Char('\n') + QString::fromUtf8(eduToolStyle.readAll());
+	} else {
+		blog(LOG_ERROR, "Failed to load embedded EduTool stylesheet");
+	}
 	const QPalette palette = PreparePalette(vars, defaultPalette);
 	setPalette(palette);
 	setStyleSheet(stylesheet);
