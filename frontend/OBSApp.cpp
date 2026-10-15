@@ -696,13 +696,19 @@ bool OBSApp::MigrateGlobalSettings()
 
 	const std::filesystem::path userConfigFile = std::filesystem::u8path(configFileString);
 
-	if (std::filesystem::exists(userConfigFile)) {
-		OBSErrorBox(nullptr,
-			    "Unable to migrate global configuration - user configuration file already exists.");
-		return false;
-	}
-
 	try {
+		if (std::filesystem::exists(userConfigFile)) {
+			// A previous run (or a newer installation) may already have created user.ini.
+			// Keep that configuration and complete the migration instead of retrying forever.
+			ConfigFile existingUserConfig;
+			if (!std::filesystem::is_regular_file(userConfigFile) ||
+			    existingUserConfig.Open(configFileString.c_str(), CONFIG_OPEN_EXISTING) != CONFIG_SUCCESS) {
+				OBSErrorBox(nullptr, "Unable to open existing user configuration file.");
+				return false;
+			}
+			return true;
+		}
+
 		std::filesystem::copy(legacyGlobalConfigFile, userConfigFile);
 	} catch (const std::filesystem::filesystem_error &) {
 		OBSErrorBox(nullptr, "Unable to migrate global configuration - copy failed.");

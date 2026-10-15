@@ -916,6 +916,22 @@ int main(int argc, char *argv[])
 #endif
 
 #ifdef _WIN32
+	// Runtime assets and portable-mode paths are relative to bin/64bit, regardless
+	// of the working directory inherited from a shortcut or another launcher.
+	wchar_t executablePath[32768];
+	DWORD executablePathLength = GetModuleFileNameW(nullptr, executablePath, _countof(executablePath));
+	if (!executablePathLength || executablePathLength >= _countof(executablePath)) {
+		return 1;
+	}
+	wchar_t *executableName = wcsrchr(executablePath, L'\\');
+	if (!executableName) {
+		return 1;
+	}
+	*executableName = L'\0';
+	if (!SetCurrentDirectoryW(executablePath)) {
+		return 1;
+	}
+
 	// Abort as early as possible if MSVC runtime is outdated
 	if (vc_runtime_outdated()) {
 		return 1;

@@ -1,0 +1,44 @@
+{
+  "date": "2026-10-16",
+  "issue": "Unable to migrate global configuration - user configuration file already exists.",
+  "cause": "An existing user.ini made migration return false, leaving Pre31Migrated=false. Relative portable-mode paths could also select AppData settings when launched from a different working directory.",
+  "changes": [
+    "Preserve and open an existing regular user.ini; mark migration complete only when it can be opened.",
+    "Keep the legacy copy path when user.ini is absent.",
+    "Initialize the Windows working directory from the executable before resolving runtime assets and portable-mode markers."
+  ],
+  "build": "RelWithDebInfo, obs-studio target, success",
+  "evidenceDirectory": "tc-screenshots/startup-config-20261016",
+  "checks": [
+    {
+      "name": "Existing user.ini with LastVersion=419430404 and Pre31Migrated=false",
+      "result": "pass",
+      "evidence": "01-existing-user-config.png",
+      "details": "Isolated runtime reached the main window. Global Pre31Migrated became true. Distinct global and user sentinel settings were retained."
+    },
+    {
+      "name": "Repeat launch from Desktop with no command-line options",
+      "result": "pass",
+      "evidence": "02-repeat-launch.png",
+      "details": "The main window opened without the migration error."
+    },
+    {
+      "name": "First migration with no user.ini",
+      "result": "pass",
+      "evidence": "03-first-migration.png",
+      "details": "A new user.ini was created from the legacy global.ini. The legacy sentinel was copied and the global migration flag became true."
+    },
+    {
+      "name": "Production runtime launch from Desktop with no command-line options",
+      "result": "pass",
+      "evidence": "04-runtime-startup.png",
+      "details": "The rebuilt executable opened with the existing EduTool layout, scene preview and recording destination."
+    },
+    {
+      "name": "Original AppData settings preserved",
+      "result": "pass",
+      "details": "SHA-256 hashes of AppData/obs-studio/global.ini and user.ini were unchanged after the isolated regression checks and final runtime launch."
+    }
+  ],
+  "scope": "Startup/configuration regression checks on this PC only; no full feature TC rerun. Screenshots and isolated fixture are git-ignored."
+}
