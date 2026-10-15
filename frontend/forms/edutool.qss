@@ -155,6 +155,17 @@ QWidget#eduToolCapturePage QPushButton#eduToolRecordButton:hover, QWidget#eduToo
 QWidget#eduToolCapturePage QPushButton#eduToolRecordButton[secondary="true"] { background: #103753; border-color: #24618b; }
 QWidget#eduToolCapturePage QScrollArea { border: none; background: #071f35; }
 
+QFrame#eduToolImportArea, QFrame#eduToolEditorInspector {
+    background: #061e33; border: 1px solid #205887; border-radius: 10px;
+}
+QLabel#eduToolEditorHeading { font-size: 23px; font-weight: 700; color: #edf6ff; }
+QWidget#eduToolEditor QPushButton#eduToolEditMode { font-size: 16px; font-weight: 600; }
+QWidget#eduToolEditor QPushButton#eduToolEditMode:checked,
+QWidget#eduToolEditor QPushButton#eduToolPrimaryAction { background: #086feb; color: white; border-color: #398ff6; font-weight: 700; }
+QWidget#eduToolEditor QPushButton#eduToolDestructiveAction { background: #b72c48; color: white; border-color: #df4a68; }
+QWidget#eduToolEditor QPushButton#eduToolPrimaryAction:disabled,
+QWidget#eduToolEditor QPushButton#eduToolEditMode:disabled { background: #142837; color: #6d7e8c; border-color: #233d50; }
+
 QWidget#eduToolCapturePage VolumeControl QPushButton { padding: 2px; min-width: 22px; min-height: 22px; }
 QWidget#eduToolCapturePage VolumeControl { background: transparent; }
 QToolBar#eduToolFeatureBar QToolButton { font-size: 16px; }

@@ -31,6 +31,39 @@
         "Pause unavailable in current output configuration",
         "Camera unavailable; device selector opens settings"
       ]
+    },
+    {
+      "id": 2,
+      "name": "editor workspace",
+      "status": "verified",
+      "reference": [
+        "22",
+        "18",
+        "20"
+      ],
+      "screenshots": [
+        "editor-empty.png",
+        "editor-selection.png",
+        "editor-split.png",
+        "editor-undo.png",
+        "editor-merge.png",
+        "editor-export-complete.png"
+      ],
+      "checks": [
+        "Empty import area and recent file double-click import",
+        "Preview and timeline remain visible after import at 1920x1032",
+        "Full viewport timeline width after maximize",
+        "Selection drag: 2.000 to 3.991 seconds",
+        "Split at 2.000 seconds produces two clips; Undo restores one",
+        "Add 3-second AVI after 8-second MP4: 11-second timeline",
+        "Export completed: H.264/AAC, 1280x720, 30 FPS, duration 11.021333 seconds",
+        "Disabled media controls before import; export/upload availability restored after completion"
+      ],
+      "limitations": [
+        "Recent file cards use media icons, not generated thumbnails",
+        "No upload/server operation",
+        "Functional smoke check of moved controls, not full editor regression"
+      ]
     }
   ]
 }

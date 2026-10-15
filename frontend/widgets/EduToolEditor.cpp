@@ -38,6 +38,9 @@
 #include <QTimer>
 #include <QDir>
 #include <QSignalBlocker>
+#include <QButtonGroup>
+#include <QFrame>
+#include <QDateTime>
 #include <QStandardPaths>
 #include <algorithm>
 #include <cmath>
@@ -78,6 +81,17 @@ protected:
 		if (frame.isNull()) return;
 		const auto size = frame.size().scaled(this->size(), Qt::KeepAspectRatio);
 		painter.drawImage(QRect(QPoint((width() - size.width()) / 2, (height() - size.height()) / 2), size), frame);
+	}
+};
+
+class EduToolTimelineScroll : public QScrollArea {
+public:
+	using QScrollArea::QScrollArea;
+	std::function<void()> resized;
+protected:
+	void resizeEvent(QResizeEvent *event) override {
+		QScrollArea::resizeEvent(event);
+		if (resized) resized();
 	}
 };
 
@@ -150,7 +164,7 @@ EduToolEditor::EduToolEditor(QWidget *parent) : QWidget(parent)
 		auto *b = new QPushButton(text, this); row->addWidget(b); connect(b, &QPushButton::clicked, this, callback); return b;
 	};
 	button(tools, QStringLiteral("새 영상 열기"), [this]() { importFiles(EduToolFileBrowser::openFiles(this, QStringLiteral("영상 열기")), true); });
-	button(tools, QStringLiteral("영상 추가"), [this]() { importFiles(EduToolFileBrowser::openFiles(this, QStringLiteral("영상 추가")), false); });
+	auto *addVideoButton = button(tools, QStringLiteral("영상 추가"), [this]() { importFiles(EduToolFileBrowser::openFiles(this, QStringLiteral("영상 추가")), false); });
 	insertMode = new QComboBox(this);
 	insertMode->addItems({QStringLiteral("맨 뒤에 추가"), QStringLiteral("맨 앞에 추가"), QStringLiteral("현재 재생 위치에 추가")});
 	tools->addWidget(insertMode);
@@ -158,6 +172,8 @@ EduToolEditor::EduToolEditor(QWidget *parent) : QWidget(parent)
 	for (const auto &path : QSettings("EduTool", "Studio").value("editor/recent").toStringList()) recent->addItem(path, path);
 	recent->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon); recent->setMinimumContentsLength(10);
 	tools->addWidget(recent, 1);
+	recent->setMaximumWidth(420);
+	tools->addStretch();
 	connect(recent, &QComboBox::activated, this, [this](int i) {
 		if (i <= 0) return;
 		QString path = recent->itemData(i).toString();
@@ -190,7 +206,51 @@ EduToolEditor::EduToolEditor(QWidget *parent) : QWidget(parent)
 	video = new QVideoWidget(preview); preview->addWidget(video);
 	video->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
 	stillFrame = new EduToolStillFrame(preview); preview->addWidget(stillFrame);
-	list = new QListWidget(splitter); list->setMinimumWidth(220); list->setWordWrap(true); list->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+	emptyPreview = new QFrame(preview);
+	emptyPreview->setObjectName(QStringLiteral("eduToolImportArea"));
+	auto *emptyLayout = new QVBoxLayout(emptyPreview);
+	emptyLayout->setContentsMargins(36, 30, 36, 30);
+	emptyLayout->addStretch();
+	auto *importHeading = new QLabel(QStringLiteral("편집할 영상을 불러오세요"), emptyPreview);
+	importHeading->setObjectName(QStringLiteral("eduToolEditorHeading"));
+	importHeading->setAlignment(Qt::AlignCenter); emptyLayout->addWidget(importHeading);
+	auto *importHint = new QLabel(QStringLiteral("영상 파일을 이곳에 끌어놓거나 아래 버튼으로 선택하세요."), emptyPreview);
+	importHint->setWordWrap(true); importHint->setAlignment(Qt::AlignCenter); emptyLayout->addWidget(importHint);
+	auto *importButton = new QPushButton(QStringLiteral("＋  영상 불러오기"), emptyPreview);
+	importButton->setObjectName(QStringLiteral("eduToolPrimaryAction"));
+	importButton->setMinimumHeight(56); emptyLayout->addWidget(importButton, 0, Qt::AlignHCenter);
+	connect(importButton, &QPushButton::clicked, this, [this]() { importFiles(EduToolFileBrowser::openFiles(this, QStringLiteral("영상 불러오기")), true); });
+	emptyLayout->addStretch();
+	preview->addWidget(emptyPreview);
+	auto *inspectorScroll = new QScrollArea(splitter);
+	inspectorScroll->setWidgetResizable(true);
+	inspectorScroll->setMinimumWidth(320); inspectorScroll->setMaximumWidth(460);
+	inspectorScroll->setFrameShape(QFrame::NoFrame);
+	auto *inspector = new QFrame;
+	inspectorScroll->setWidget(inspector);
+	inspector->setObjectName(QStringLiteral("eduToolEditorInspector"));
+	inspector->setMinimumWidth(300); inspector->setMaximumWidth(460);
+	auto *inspectorLayout = new QVBoxLayout(inspector);
+	inspectorLayout->setContentsMargins(16, 12, 16, 12); inspectorLayout->setSpacing(8);
+	modeHeading = new QLabel(QStringLiteral("구간 선택"), inspector);
+	modeHeading->setObjectName(QStringLiteral("eduToolEditorHeading")); inspectorLayout->addWidget(modeHeading);
+	emptyGuide = new QLabel(QStringLiteral("시작하기\n\n1. 영상 불러오기\n2. 구간 선택 · 나누기 · 합치기\n3. 작업 저장 또는 영상 내보내기"), inspector);
+	emptyGuide->setWordWrap(true); inspectorLayout->addWidget(emptyGuide);
+	editModes = new QStackedWidget(inspector); inspectorLayout->addWidget(editModes);
+	auto makeMode = [this](const QString &hint) {
+		auto *page = new QWidget(editModes); auto *row = new QVBoxLayout(page);
+		row->setContentsMargins(0, 0, 0, 0); row->setSpacing(8);
+		auto *label = new QLabel(hint, page); label->setWordWrap(true); row->addWidget(label);
+		editModes->addWidget(page); return row;
+	};
+	auto *selectionPanel = makeMode(QStringLiteral("① 타임라인에서 구간을 드래그하거나\n② 시작과 끝 시간을 지정하세요."));
+	auto *splitPanel = makeMode(QStringLiteral("① 타임라인에서 재생 위치를 선택하세요.\n② 나누기를 눌러 두 조각으로 분리하세요."));
+	auto *mergePanel = makeMode(QStringLiteral("① 추가할 위치를 선택하세요.\n② 영상을 추가한 뒤 내보내기로 합치세요."));
+	mergePanel->addWidget(new QLabel(QStringLiteral("영상 삽입 위치"), inspector));
+	mergePanel->addWidget(insertMode); mergePanel->addWidget(addVideoButton); mergePanel->addStretch();
+	clipListHeading = new QLabel(inspector); inspectorLayout->addWidget(clipListHeading);
+	list = new QListWidget(inspector); list->setMinimumWidth(220); list->setWordWrap(true); list->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+	inspectorLayout->addWidget(list, 1);
 	splitter->setStretchFactor(0, 0); splitter->setStretchFactor(1, 4); splitter->setStretchFactor(2, 1);
 	QTimer::singleShot(0, this, [splitter]() { splitter->setSizes({0, 900, 250}); });
 	player = new QMediaPlayer(this); audio = new QAudioOutput(this); audio->setVolume(0.7f);
@@ -214,14 +274,30 @@ EduToolEditor::EduToolEditor(QWidget *parent) : QWidget(parent)
 	volume->setAccessibleName(QStringLiteral("편집 미리보기 볼륨")); playback->addWidget(volume);
 	connect(volume, &QSlider::valueChanged, this, [this](int v) { audio->setVolume(v / 100.0f); });
 	clock = new QLabel(this); playback->addWidget(clock, 1);
-	auto *scroll = new QScrollArea(this); scroll->setWidgetResizable(false); scroll->setFixedHeight(140);
+	auto *modeBar = new QHBoxLayout; layout->addLayout(modeBar);
+	auto *modeButtons = new QButtonGroup(this); modeButtons->setExclusive(true);
+	const QStringList modeTitles{QStringLiteral("구간 선택"), QStringLiteral("영상 나누기"), QStringLiteral("영상 합치기")};
+	for (int i = 0; i < modeTitles.size(); ++i) {
+		auto *mode = new QPushButton(modeTitles[i], this);
+		mode->setCheckable(true); mode->setChecked(i == 0); mode->setMinimumHeight(46);
+		mode->setObjectName(QStringLiteral("eduToolEditMode"));
+		modeBar->addWidget(mode); modeButtons->addButton(mode, i);
+		connect(mode, &QPushButton::clicked, this, [this, i, modeTitles]() { editModes->setCurrentIndex(i); modeHeading->setText(modeTitles[i]); });
+	}
+	modeBar->addStretch();
+	auto *scroll = new EduToolTimelineScroll(this); scroll->setWidgetResizable(false); scroll->setFixedHeight(140);
 	timeline = new EduToolTimeline(scroll); timeline->resize(800, 112); scroll->setWidget(timeline); layout->addWidget(scroll);
 	timeline->scrub = [this](qint64 p) { selectionPlayback = false; seek(p); };
 	timeline->selection = [this](qint64 a, qint64 b) { start->setValue(a / 1000.0); end->setValue(b / 1000.0); };
-	auto *selectionRow = new QHBoxLayout; layout->addLayout(selectionRow);
-	auto *edits = selectionRow;
+	QBoxLayout *edits = selectionPanel;
 	start = new EduToolTimeSpinBox(this); end = new EduToolTimeSpinBox(this);
-	for (auto *spin : {start, end}) { spin->setDecimals(3); spin->setSuffix(QStringLiteral(" 초")); edits->addWidget(spin); }
+	auto *timeFields = new QHBoxLayout; selectionPanel->addLayout(timeFields);
+	for (auto *spin : {start, end}) {
+		spin->setDecimals(3); spin->setSuffix(QStringLiteral(" 초"));
+		auto *field = new QVBoxLayout; timeFields->addLayout(field);
+		field->addWidget(new QLabel(spin == start ? QStringLiteral("시작 시간") : QStringLiteral("끝 시간"), this));
+		field->addWidget(spin);
+	}
 	start->setAccessibleName(QStringLiteral("선택 시작")); end->setAccessibleName(QStringLiteral("선택 끝"));
 	auto *selectionLength = new QLabel(QStringLiteral("선택 길이: 0.000 초"), this);
 	selectionLength->setAccessibleName(QStringLiteral("선택 구간 길이"));
@@ -230,33 +306,38 @@ EduToolEditor::EduToolEditor(QWidget *parent) : QWidget(parent)
 		static_cast<EduToolTimeSpinBox *>(spin)->invalidTime = [selectionLength](const QString &message) {
 			selectionLength->setText(message);
 		};
-	layout->addWidget(selectionLength);
+	selectionPanel->addWidget(selectionLength);
 	for (auto *spin : {start, end}) connect(spin, &QDoubleSpinBox::valueChanged, this, [this, selectionLength](double) {
 		timeline->from = qint64(start->value() * 1000); timeline->to = qint64(end->value() * 1000); timeline->update();
 		selectionLength->setText(end->value() < start->value() ? QStringLiteral("선택 범위 오류: 끝 시간을 시작 시간 이후로 지정하세요.")
 			: QStringLiteral("선택 길이: %1 초").arg(end->value() - start->value(), 0, 'f', 3));
 	});
+	auto *selectionActions = new QHBoxLayout; selectionPanel->addLayout(selectionActions); edits = selectionActions;
 	button(edits, QStringLiteral("선택 재생"), [this]() {
 		if (end->value() <= start->value()) { showError(QStringLiteral("끝 시간을 시작 시간보다 뒤로 설정하세요.")); return; }
 		selectionPlayback = true; seek(qint64(start->value() * 1000), true);
 	});
 	button(edits, QStringLiteral("선택 해제"), [this]() { selectionPlayback = false; start->setValue(0); end->setValue(0); });
-	auto *editRow = new QHBoxLayout; layout->addLayout(editRow); edits = editRow;
-	button(edits, QStringLiteral("구간 삭제"), [this]() { removeSelection(); });
-	button(edits, QStringLiteral("나누기"), [this]() { split(); });
+	auto *removeSelectionButton = button(edits, QStringLiteral("구간 삭제"), [this]() { removeSelection(); });
+	removeSelectionButton->setObjectName(QStringLiteral("eduToolDestructiveAction"));
+	selectionPanel->addStretch();
+	button(splitPanel, QStringLiteral("현재 위치에서 나누기"), [this]() { split(); }); splitPanel->addStretch();
+	edits = modeBar;
 	button(edits, QStringLiteral("실행 취소"), [this]() { if (!undo.isEmpty() && !exporting && !importing) { redo.push_back(snapshot()); restore(undo.takeLast()); } });
 	button(edits, QStringLiteral("다시 실행"), [this]() { if (!redo.isEmpty() && !exporting && !importing) { undo.push_back(snapshot()); restore(redo.takeLast()); } });
 	auto *bottom = new QHBoxLayout; layout->addLayout(bottom);
 	zoom = new QSlider(Qt::Horizontal, this); zoom->setRange(1, 30); zoom->setValue(1); zoom->setMaximumWidth(120);
 	zoom->setAccessibleName(QStringLiteral("타임라인 확대")); bottom->addWidget(zoom);
 	auto resizeTimeline = [this, scroll]() { timeline->resize(std::max(400, scroll->viewport()->width()) * zoom->value(), 112); timeline->update(); };
+	scroll->resized = resizeTimeline;
 	connect(zoom, &QSlider::valueChanged, this, [resizeTimeline](int) { resizeTimeline(); });
 	button(bottom, QStringLiteral("전체 보기"), [this, resizeTimeline]() { zoom->setValue(1); resizeTimeline(); });
-	button(bottom, QStringLiteral("작업 열기"), [this]() { loadProject(); });
-	button(bottom, QStringLiteral("작업 저장"), [this]() { saveProject(); });
-	auto *exportRow = new QHBoxLayout; layout->addLayout(exportRow); bottom = exportRow;
-	button(bottom, QStringLiteral("조각 저장"), [this]() { exportVideo(true); });
-	button(bottom, QStringLiteral("영상 내보내기"), [this]() { exportVideo(false); });
+	button(tools, QStringLiteral("작업 열기"), [this]() { loadProject(); });
+	button(modeBar, QStringLiteral("작업 저장"), [this]() { saveProject(); });
+	bottom->addStretch();
+	button(selectionPanel, QStringLiteral("선택 구간 저장"), [this]() { exportVideo(true); });
+	auto *exportButton = button(modeBar, QStringLiteral("영상 내보내기"), [this]() { exportVideo(false); });
+	exportButton->setObjectName(QStringLiteral("eduToolPrimaryAction"));
 	button(bottom, QStringLiteral("마지막 완료 영상 업로드"), [this]() {
 		if (exporting || completedExportPath.isEmpty() || !QFileInfo(completedExportPath).isFile()) { showError(QStringLiteral("먼저 영상 내보내기를 완료하세요.")); return; }
 		emit uploadRequested(completedExportPath);
@@ -266,16 +347,24 @@ EduToolEditor::EduToolEditor(QWidget *parent) : QWidget(parent)
 		if (exporting && encoder) { abortExport = true; encoder->kill(); }
 	});
 	cancel->setObjectName(QStringLiteral("eduToolCancelMediaJob"));
+	const QStringList mediaActions{QStringLiteral("재생 / 일시정지"), QStringLiteral("전체화면"), QStringLiteral("작업 저장"),
+		QStringLiteral("영상 내보내기"), QStringLiteral("선택 구간 저장"), QStringLiteral("구간 선택"), QStringLiteral("영상 나누기"), QStringLiteral("영상 합치기")};
+	for (auto *b : findChildren<QPushButton *>()) b->setProperty("requiresMedia", mediaActions.contains(b->text()));
 	status = new QLabel(QStringLiteral("영상 파일을 열거나 이 화면에 끌어놓으세요."), this); status->setWordWrap(true); status->setTextFormat(Qt::PlainText); layout->addWidget(status);
 	connect(list, &QListWidget::itemDoubleClicked, this, [this](QListWidgetItem *item) {
 		if (exporting || importing) return;
+		if (clips.isEmpty()) {
+			const int recentIndex = recent->findData(item->data(Qt::UserRole));
+			if (recentIndex > 0) emit recent->activated(recentIndex);
+			return;
+		}
 		const int index = list->row(item); bool ok;
 		const auto name = QInputDialog::getText(this, QStringLiteral("조각 이름"), QStringLiteral("이름"), QLineEdit::Normal, clips[index].name, &ok);
 		if (ok && !name.trimmed().isEmpty()) { checkpoint(); clips[index].name = name.trimmed(); refresh(); }
 	});
 	list->setContextMenuPolicy(Qt::CustomContextMenu);
 	connect(list, &QListWidget::customContextMenuRequested, this, [this](const QPoint &) {
-		if (exporting || importing || list->currentRow() < 0) return;
+		if (exporting || importing || clips.isEmpty() || list->currentRow() < 0) return;
 		const int index = list->currentRow();
 		const auto choice = QInputDialog::getItem(this, QStringLiteral("조각 순서"), QStringLiteral("이동"), {QStringLiteral("위로"), QStringLiteral("아래로")}, 0, false);
 		const int target = choice == QStringLiteral("위로") ? index - 1 : choice == QStringLiteral("아래로") ? index + 1 : index;
@@ -322,6 +411,19 @@ void EduToolEditor::setBusy(bool busy)
 {
 	for (auto *b : findChildren<QPushButton *>()) if (b->objectName() != "eduToolCancelMediaJob") b->setEnabled(!busy);
 	list->setEnabled(!busy); start->setEnabled(!busy); end->setEnabled(!busy); recent->setEnabled(!busy); insertMode->setEnabled(!busy);
+	editModes->setEnabled(!busy && !clips.isEmpty());
+	updateAvailability();
+}
+void EduToolEditor::updateAvailability()
+{
+	const bool ready = !importing && !exporting;
+	for (auto *b : findChildren<QPushButton *>()) {
+		if (b->property("requiresMedia").toBool()) b->setEnabled(ready && !clips.isEmpty());
+		if (b->text() == QStringLiteral("실행 취소")) b->setEnabled(ready && !undo.isEmpty());
+		if (b->text() == QStringLiteral("다시 실행")) b->setEnabled(ready && !redo.isEmpty());
+		if (b->text() == QStringLiteral("마지막 완료 영상 업로드")) b->setEnabled(ready && !completedExportPath.isEmpty());
+		if (b->objectName() == "eduToolCancelMediaJob") b->setEnabled(!ready);
+	}
 }
 EduToolEditor::EditState EduToolEditor::snapshot() const
 {
@@ -336,9 +438,26 @@ void EduToolEditor::checkpoint() { undo.push_back(snapshot()); if (undo.size() >
 void EduToolEditor::refresh()
 {
 	pendingPlay = false; player->pause(); list->clear();
+	emptyGuide->setVisible(clips.isEmpty());
+	modeHeading->setText(clips.isEmpty() ? QStringLiteral("시작하기") : editModes->currentIndex() == 0 ? QStringLiteral("구간 선택")
+		: editModes->currentIndex() == 1 ? QStringLiteral("영상 나누기") : QStringLiteral("영상 합치기"));
+	clipListHeading->setText(clips.isEmpty() ? QStringLiteral("최근 영상 · 더블클릭으로 불러오기") : QStringLiteral("영상 조각 · 더블클릭으로 이름 변경"));
+	if (clips.isEmpty()) {
+		for (int i = 1; i < std::min(recent->count(), 5); ++i) {
+			const QString path = recent->itemData(i).toString();
+			const QFileInfo file(path);
+			auto *item = new QListWidgetItem(QIcon(QStringLiteral(":/res/images/sources/media.svg")),
+				file.fileName() + "\n" + (file.exists() ? file.lastModified().toString("yyyy-MM-dd HH:mm") : QStringLiteral("파일 위치 확인 필요")), list);
+			item->setData(Qt::UserRole, path); item->setToolTip(path);
+		}
+	}
+	editModes->setVisible(!clips.isEmpty());
+	editModes->setEnabled(!clips.isEmpty() && !importing && !exporting);
+	updateAvailability();
 	for (const auto &c : clips) {
 		const QString details = QStringLiteral("%1\n%2 — %3\n%4×%5\n%6 FPS · %7 MB").arg(c.name, stamp(c.in), stamp(c.out)).arg(c.width).arg(c.height).arg(c.fps, 0, 'f', 2).arg(QFileInfo(c.path).size() / (1024.0 * 1024.0), 0, 'f', 1);
 		auto *item = new QListWidgetItem(details, list);
+		item->setIcon(QIcon(QStringLiteral(":/res/images/sources/media.svg")));
 		item->setToolTip(details + "\n" + c.path);
 	}
 	start->setMaximum(total() / 1000.0); end->setMaximum(total() / 1000.0);
@@ -357,7 +476,7 @@ void EduToolEditor::seek(qint64 milliseconds, bool play)
 	++seekGeneration; transitionPending = false; pendingPlay = play;
 	if (clips.isEmpty()) {
 		applyingSeek = true; activeClip = -1; awaitingMedia = false; player->stop(); player->setSource(QUrl()); applyingSeek = false;
-		stillFrame->frame = {}; stillFrame->update(); preview->setCurrentWidget(stillFrame);
+		stillFrame->frame = {}; stillFrame->update(); preview->setCurrentWidget(emptyPreview);
 		position = 0; clock->setText(stamp(0)); return;
 	}
 	position = std::clamp(milliseconds, qint64(0), total());
@@ -667,4 +786,5 @@ void EduToolEditor::finishExport(bool success, const QString &message)
 		: QStringLiteral("임시 결과를 정리하지 못했습니다: %1").arg(temporaryPath);
 	status->setText(success ? message : message + QStringLiteral("\n%1 편집 작업은 유지됩니다. 원본 파일과 저장 폴더를 확인한 뒤 다시 내보내세요.").arg(cleanup));
 	if (success) { completedExportPath = exportPath; emit exportReady(completedExportPath); }
+	updateAvailability();
 }

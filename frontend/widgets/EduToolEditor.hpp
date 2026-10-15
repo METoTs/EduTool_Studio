@@ -61,6 +61,9 @@ private:
 	QAudioOutput *audio;
 	QVideoWidget *video;
 	QStackedWidget *preview;
+	QWidget *emptyPreview;
+	QStackedWidget *editModes;
+	QLabel *modeHeading, *emptyGuide, *clipListHeading;
 	EduToolStillFrame *stillFrame;
 	QSplitter *previewSplitter;
 	QDialog *fullscreen = nullptr;
@@ -104,6 +107,7 @@ private:
 	void renderNext();
 	void finishExport(bool success, const QString &message);
 	void setBusy(bool busy);
+	void updateAvailability();
 	QString tool(const QString &name) const;
 	void showError(const QString &message);
 };
