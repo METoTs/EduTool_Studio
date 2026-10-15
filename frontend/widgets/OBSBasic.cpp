@@ -1791,10 +1791,21 @@ void OBSBasic::OBSInit()
 
 	// Do not restore the old preview toolbar into the new fixed capture shell.
 	QTimer::singleShot(0, this, [this]() {
+		// Apply the saved window geometry after hiding the legacy docks, whose
+		// minimum sizes can otherwise enlarge a restored normal window.
+		const char *savedGeometry = config_get_string(App()->GetUserConfig(), "BasicWindow", "geometry");
+		const QByteArray windowGeometry = savedGeometry ? QByteArray::fromBase64(savedGeometry) : QByteArray();
 		restoreState(startingDockLayout);
 		const QString mode = QString::fromUtf8(config_get_string(App()->GetUserConfig(), "EduTool", "LastFeature"));
 		const QString actionName = mode == "edit" ? "eduToolEditPageAction" : mode == "upload" ? "eduToolUploadPageAction" : mode == "live" ? "eduToolLivePageAction" : "eduToolRecordPageAction";
 		if (auto *action = findChild<QAction *>(actionName)) action->trigger();
+		if (!windowGeometry.isEmpty()) restoreGeometry(windowGeometry);
+		// Refresh the native maximized bounds after the saved dock layout has
+		// resized the client area; preserve minimized/tray startup behavior.
+		if (isVisible() && isMaximized() && !isMinimized()) {
+			showNormal();
+			showMaximized();
+		}
 	});
 
 	bool pre23Defaults = config_get_bool(App()->GetUserConfig(), "General", "Pre23Defaults");

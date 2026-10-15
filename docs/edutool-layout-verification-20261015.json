@@ -95,6 +95,29 @@
         "Source placement presets and audio parameter changes not repeated in this layout smoke test",
         "Audio retains immediate-apply behavior rather than reference Apply/Cancel workflow"
       ]
+    },
+    {
+      "id": 4,
+      "name": "startup window restoration",
+      "status": "verified",
+      "reference": [
+        "13"
+      ],
+      "screenshots": [
+        "startup-size-interim.png",
+        "startup-normal.png",
+        "startup-maximized.png"
+      ],
+      "checks": [
+        "Reapply saved geometry after feature page selection hides legacy docks",
+        "Refresh native maximized bounds after dock reset",
+        "Final build restart opens maximized at 1920x1032 without manual maximize",
+        "Normal-mode restart remains non-maximized; verified at 1052x802"
+      ],
+      "limitations": [
+        "Small windows remain subject to layout minimum sizes; arbitrary saved dimensions are not guaranteed",
+        "Other monitor/DPI configurations and minimized/tray startup not manually tested"
+      ]
     }
   ]
 }
