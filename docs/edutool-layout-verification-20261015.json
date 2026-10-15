@@ -64,6 +64,37 @@
         "No upload/server operation",
         "Functional smoke check of moved controls, not full editor regression"
       ]
+    },
+    {
+      "id": 3,
+      "name": "source and audio dialogs",
+      "status": "verified",
+      "reference": [
+        "04",
+        "07"
+      ],
+      "screenshots": [
+        "sources.png",
+        "source-dialog.png",
+        "audio.png",
+        "audio-dialog.png",
+        "audio-details.png",
+        "audio-details-dialog.png"
+      ],
+      "checks": [
+        "Selected 640x360 image source rendered in dedicated preview",
+        "Source manager close and reopen without crash",
+        "PIP diagrams completely visible after button height correction",
+        "Microphone and PC audio cards visible side by side",
+        "Both advanced panels expand with gain, monitoring and automatic volume controls visible",
+        "Audio window closes and returns to capture page"
+      ],
+      "limitations": [
+        "Camera hardware preview not tested; image source used",
+        "No live listening or microphone speech test",
+        "Source placement presets and audio parameter changes not repeated in this layout smoke test",
+        "Audio retains immediate-apply behavior rather than reference Apply/Cancel workflow"
+      ]
     }
   ]
 }

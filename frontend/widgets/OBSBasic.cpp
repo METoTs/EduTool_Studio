@@ -1974,7 +1974,7 @@ void OBSBasic::OpenEduToolAudioSettings()
 	dialog->setObjectName(QStringLiteral("eduToolAudioSettings"));
 	dialog->setWindowTitle(QStringLiteral("오디오 설정"));
 	dialog->setAttribute(Qt::WA_DeleteOnClose);
-	dialog->resize(720, 600);
+	dialog->resize(1040, 680);
 	auto *layout = new QVBoxLayout(dialog);
 	layout->setContentsMargins(24, 24, 24, 24);
 	layout->setSpacing(14);
@@ -2010,7 +2010,13 @@ void OBSBasic::OpenEduToolAudioSettings()
 			return;
 		*signature = next;
 		auto *content = new QWidget;
-		auto *rows = new QVBoxLayout(content);
+		content->setObjectName(QStringLiteral("eduToolAudioContent"));
+		auto *rows = new QHBoxLayout(content);
+		rows->setSpacing(16);
+		auto *micColumn = new QVBoxLayout;
+		auto *pcColumn = new QVBoxLayout;
+		rows->addLayout(micColumn, 1);
+		rows->addLayout(pcColumn, 1);
 		int count = 0;
 		for (uint32_t channel = 1; channel <= 6; ++channel) {
 			OBSSourceAutoRelease source = obs_get_output_source(channel);
@@ -2027,6 +2033,14 @@ void OBSBasic::OpenEduToolAudioSettings()
 			auto *filtersButton = new QPushButton(QStringLiteral("오디오 필터"), group);
 			actions->addWidget(propertiesButton);
 			actions->addWidget(filtersButton);
+			auto *showDetails = new QCheckBox(QStringLiteral("세부 설정 · 게인 / 모니터링 / 자동 음량"), group);
+			row->addWidget(showDetails);
+			auto *advanced = new QWidget(group);
+			row->addWidget(advanced);
+			advanced->hide();
+			connect(showDetails, &QCheckBox::toggled, advanced, &QWidget::setVisible);
+			row = new QVBoxLayout(advanced);
+			row->setContentsMargins(0, 8, 0, 0);
 			auto *automatic = new QCheckBox(QStringLiteral("자동 음량 조절 — 큰 소리 줄이기 (압축)"), group);
 			row->addWidget(automatic);
 			const QString uuid = QString::fromUtf8(obs_source_get_uuid(source));
@@ -2138,10 +2152,11 @@ void OBSBasic::OpenEduToolAudioSettings()
 			connect(timer, &QTimer::timeout, group, sync);
 			timer->start(1000);
 			sync();
-			rows->addWidget(group);
+			(channel <= 2 ? pcColumn : micColumn)->addWidget(group);
 		}
 		if (!count) rows->addWidget(new QLabel(QStringLiteral("입력이 없습니다. ‘입력·PC 소리 장치 구성’에서 장치를 선택하세요."), content));
-		rows->addStretch();
+		micColumn->addStretch();
+		pcColumn->addStretch();
 		scroll->setWidget(content);
 	};
 	auto *timer = new QTimer(dialog);

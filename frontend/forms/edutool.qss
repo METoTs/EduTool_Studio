@@ -90,7 +90,17 @@ QDialog#eduToolSourceManager QPushButton, QDialog#eduToolCameraSettings QPushBut
 QDialog#eduToolAudioSettings QPushButton {
     padding: 10px 14px;
     border-radius: 6px;
+    border: 1px solid #205887;
+    background: #103754;
+    color: #e7f1ff;
 }
+
+QDialog#eduToolSourceManager QPushButton:hover, QDialog#eduToolAudioSettings QPushButton:hover { background: #1266cf; }
+QDialog#eduToolSourceManager QPushButton:disabled, QDialog#eduToolAudioSettings QPushButton:disabled { background: #142837; color: #6d7e8c; }
+QDialog#eduToolAudioSettings QGroupBox { background: #061e33; border: 1px solid #205887; border-radius: 8px; margin-top: 18px; padding: 16px 12px 12px; }
+QDialog#eduToolAudioSettings QGroupBox::title { subcontrol-origin: margin; subcontrol-position: top left; padding: 0 10px; color: #edf6ff; font-size: 18px; font-weight: 600; }
+QDialog#eduToolAudioSettings VolumeControl QPushButton { padding: 2px; min-width: 22px; min-height: 22px; }
+QDialog#eduToolAudioSettings QScrollArea, QWidget#eduToolAudioContent { background: #09203a; border: none; }
 
 QWidget#eduToolEditor, QWidget#eduToolPortal {
     background: #09203a;

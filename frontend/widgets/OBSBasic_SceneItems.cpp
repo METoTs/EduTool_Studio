@@ -20,6 +20,8 @@
 #include "OBSBasic.hpp"
 #include "ColorSelect.hpp"
 #include "OBSProjector.hpp"
+#include "OBSQTDisplay.hpp"
+#include <utility/display-helpers.hpp>
 
 #include <components/VolumeControl.hpp>
 #include <dialogs/NameDialog.hpp>
@@ -38,11 +40,58 @@
 #include <QSignalBlocker>
 #include <QTimer>
 #include <QVBoxLayout>
+#include <QPainter>
+#include <mutex>
 
 #include <sstream>
 #include <algorithm>
 
 using namespace std;
+
+// A read-only source preview, with balanced showing references and render-thread access.
+class EduToolSourcePreview : public OBSQTDisplay {
+	std::mutex mutex;
+	OBSSource source;
+	static void draw(void *data, uint32_t cx, uint32_t cy)
+	{
+		auto *self = static_cast<EduToolSourcePreview *>(data);
+		OBSSource current;
+		{ std::lock_guard<std::mutex> lock(self->mutex); current = self->source; }
+		if (!current || obs_source_removed(current)) return;
+		const uint32_t width = std::max(1u, obs_source_get_width(current));
+		const uint32_t height = std::max(1u, obs_source_get_height(current));
+		int x, y; float scale;
+		GetScaleAndCenterPos(width, height, cx, cy, x, y, scale);
+		gs_viewport_push(); gs_projection_push();
+		const bool previous = gs_set_linear_srgb(true);
+		gs_ortho(0, float(width), 0, float(height), -100, 100);
+		gs_set_viewport(x, y, int(width * scale), int(height * scale));
+		obs_source_video_render(current);
+		gs_set_linear_srgb(previous); gs_projection_pop(); gs_viewport_pop();
+	}
+public:
+	explicit EduToolSourcePreview(QWidget *parent) : OBSQTDisplay(parent)
+	{
+		setMinimumSize(320, 180);
+		connect(this, &OBSQTDisplay::DisplayCreated, this, [this]() { obs_display_add_draw_callback(GetDisplay(), draw, this); });
+	}
+	void select(obs_source_t *next)
+	{
+		OBSSource previous;
+		{
+			std::lock_guard<std::mutex> lock(mutex);
+			if (source == next) return;
+			previous = source; source = next;
+		}
+		if (next) obs_source_inc_showing(next);
+		if (previous) obs_source_dec_showing(previous);
+	}
+	~EduToolSourcePreview() override
+	{
+		if (GetDisplay()) obs_display_remove_draw_callback(GetDisplay(), draw, this);
+		select(nullptr);
+	}
+};
 
 namespace {
 bool isHiddenInMixer(obs_source_t *source)
@@ -860,7 +909,7 @@ void OBSBasic::OpenEduToolSourceManager()
 	dialog->setObjectName(QStringLiteral("eduToolSourceManager"));
 	dialog->setWindowTitle(QStringLiteral("소스 관리"));
 	dialog->setAttribute(Qt::WA_DeleteOnClose);
-	dialog->resize(720, 520);
+	dialog->resize(1040, 680);
 	auto *layout = new QVBoxLayout(dialog);
 	layout->setContentsMargins(24, 24, 24, 24);
 	layout->setSpacing(14);
@@ -874,11 +923,19 @@ void OBSBasic::OpenEduToolSourceManager()
 	auto *list = new QListWidget(dialog);
 	list->setObjectName(QStringLiteral("eduToolSourceList"));
 	list->setSelectionMode(QAbstractItemView::SingleSelection);
-	layout->addWidget(list, 1);
+	list->setIconSize(QSize(40, 40));
+	auto *body = new QHBoxLayout;
+	layout->addLayout(body, 1);
+	body->addWidget(list, 2);
+	auto *previewColumn = new QVBoxLayout;
+	body->addLayout(previewColumn, 3);
+	previewColumn->addWidget(new QLabel(QStringLiteral("선택 소스 미리보기"), dialog));
+	auto *sourcePreview = new EduToolSourcePreview(dialog);
+	previewColumn->addWidget(sourcePreview, 1);
 	auto *details = new QLabel(dialog);
 	details->setTextFormat(Qt::PlainText);
 	details->setWordWrap(true);
-	layout->addWidget(details);
+	previewColumn->addWidget(details);
 	auto *actions = new QHBoxLayout;
 	layout->addLayout(actions);
 	auto button = [dialog, actions](const QString &text) {
@@ -898,6 +955,18 @@ void OBSBasic::OpenEduToolSourceManager()
 	auto *full = new QPushButton(QStringLiteral("전체 화면 배치"), dialog);
 	for (auto *control : {left, right, full})
 		placement->addWidget(control);
+	int placementIndex = 0;
+	for (auto *control : {left, right, full}) {
+		control->setMinimumHeight(80);
+		QPixmap diagram(100, 58); diagram.fill(Qt::transparent);
+		QPainter painter(&diagram); painter.setRenderHint(QPainter::Antialiasing);
+		painter.setPen(QPen(QColor("#62a6d8"), 2)); painter.setBrush(QColor("#08253d"));
+		painter.drawRoundedRect(QRect(2, 2, 96, 54), 4, 4);
+		painter.setBrush(QColor("#1685ef"));
+		painter.drawRoundedRect(placementIndex == 2 ? QRect(8, 8, 84, 42) : QRect(placementIndex == 0 ? 8 : 60, 30, 32, 20), 2, 2);
+		painter.end(); control->setIcon(QIcon(diagram)); control->setIconSize(QSize(100, 58));
+		++placementIndex;
+	}
 	auto *close = new QPushButton(QStringLiteral("닫기"), dialog);
 	layout->addWidget(close, 0, Qt::AlignRight);
 	connect(close, &QPushButton::clicked, dialog, &QDialog::close);
@@ -923,7 +992,7 @@ void OBSBasic::OpenEduToolSourceManager()
 		ui->sources->SelectItem(item, true);
 		return true;
 	};
-	auto refresh = [this, list, items, details, selected, propertiesButton, up, down, remove, left, right, full]() {
+	auto refresh = [this, list, items, details, selected, sourcePreview, propertiesButton, up, down, remove, left, right, full]() {
 		OBSSceneItem current = selected();
 		QSignalBlocker blocker(list);
 		std::vector<OBSSceneItem> nextItems;
@@ -946,11 +1015,13 @@ void OBSBasic::OpenEduToolSourceManager()
 			const OBSSceneItem &item = items->at(row);
 			auto *entry = list->item(int(row));
 			entry->setText(QString::fromUtf8(obs_source_get_name(obs_sceneitem_get_source(item))));
+			entry->setIcon(GetSourceIcon(obs_source_get_id(obs_sceneitem_get_source(item))));
 			entry->setFlags(entry->flags() | Qt::ItemIsUserCheckable);
 			entry->setCheckState(obs_sceneitem_visible(item) ? Qt::Checked : Qt::Unchecked);
 		}
 		current = selected();
 		obs_source_t *source = current ? obs_sceneitem_get_source(current) : nullptr;
+		sourcePreview->select(source && (obs_source_get_output_flags(source) & OBS_SOURCE_VIDEO) ? source : nullptr);
 		const bool canPlace = current && !obs_sceneitem_locked(current) &&
 			!obs_sceneitem_get_group(GetCurrentScene(), current) &&
 			(obs_source_get_output_flags(source) & OBS_SOURCE_VIDEO);
@@ -964,7 +1035,7 @@ void OBSBasic::OpenEduToolSourceManager()
 			.arg(QString::fromUtf8(obs_source_get_name(source))).arg(obs_source_get_width(source)).arg(obs_source_get_height(source))
 			: QStringLiteral("소스를 선택하세요. 그룹 내부 소스는 메인 소스 목록에서 그룹을 펼치면 표시됩니다."));
 	};
-	connect(list, &QListWidget::currentRowChanged, dialog, [selectMain](int) { selectMain(); });
+	connect(list, &QListWidget::currentRowChanged, dialog, [selectMain, refresh](int) { selectMain(); refresh(); });
 	connect(list, &QListWidget::itemChanged, dialog, [this, list, items](QListWidgetItem *entry) {
 		const int row = list->row(entry);
 		if (row < 0 || size_t(row) >= items->size())
