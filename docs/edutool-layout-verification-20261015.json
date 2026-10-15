@@ -1,0 +1,36 @@
+{
+  "started": "2026-10-15",
+  "updated": "2026-10-16",
+  "scope": "Reference layout improvement; functional smoke checks, not full 97-case retest",
+  "bundles": [
+    {
+      "id": 1,
+      "name": "capture main",
+      "status": "verified",
+      "reference": [
+        "13",
+        "14"
+      ],
+      "screenshots": [
+        "main-record.png",
+        "main-live.png",
+        "main-normal.png",
+        "main-recording.png",
+        "main-record-stopped.png"
+      ],
+      "checks": [
+        "Legacy toolbar overlap fixed",
+        "Main controls visible at 1920x1032; sidebar scroll available at smaller height",
+        "Record and live mode switch",
+        "Auto upload unchecked during local recording",
+        "Record/start/stop and storage controls locking/restoration",
+        "MP4 saved: 1280x720, audio stream, duration 18.533333 seconds"
+      ],
+      "limitations": [
+        "No live broadcast/server operation",
+        "Pause unavailable in current output configuration",
+        "Camera unavailable; device selector opens settings"
+      ]
+    }
+  ]
+}

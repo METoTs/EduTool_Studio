@@ -80,6 +80,7 @@ EduToolPortal::EduToolPortal(QWidget *parent) : QWidget(parent)
 	form->addRow(QStringLiteral("동영상"), file); form->addRow(QStringLiteral("영상 제목"), title);
 	button(folderButtons, QStringLiteral("영상 선택"), [this]() { const auto path = QFileDialog::getOpenFileName(this, QStringLiteral("업로드할 영상"), {}, QStringLiteral("영상 (*.mp4 *.mkv *.mov *.avi *.webm)")); if (!path.isEmpty()) offerFile(path); });
 	automatic = new QCheckBox(QStringLiteral("녹화 종료 후 자동 업로드"), content);
+	automatic->setObjectName(QStringLiteral("eduToolAutoUpload"));
 	notify = new QCheckBox(QStringLiteral("업로드 완료 알림"), content);
 	removeOriginal = new QCheckBox(QStringLiteral("서버가 파일 전체 검증을 완료한 뒤 원본 삭제"), content);
 	for (auto *option : {automatic, notify, removeOriginal}) { layout->addWidget(option); connect(option, &QCheckBox::toggled, this, [this](bool) { persistOptions(); }); }

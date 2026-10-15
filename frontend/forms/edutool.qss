@@ -126,3 +126,35 @@ QWidget#eduToolEditor QListWidget::item {
 QPushButton#recordButton {
     font-weight: 700;
 }
+
+/* Fixed capture shell: independent of the user's saved OBS dock geometry. */
+QWidget#eduToolCapturePage, QWidget#eduToolDevicePanel {
+    background: #071f35;
+    color: #e9f3ff;
+}
+QFrame#eduToolPreviewFrame, QFrame#eduToolDeviceCard, QFrame#eduToolCaptureActions {
+    background: #09253e;
+    border: 1px solid #194d70;
+    border-radius: 10px;
+}
+QWidget#eduToolCapturePage QLabel { color: #d9eafa; background: transparent; }
+QLabel#eduToolCardHeading { font-size: 20px; font-weight: 700; color: white; }
+QToolBar#eduToolCapturePreviewBar { background: transparent; border: none; spacing: 8px; padding: 2px; }
+QWidget#eduToolCapturePage QPushButton, QToolBar#eduToolCapturePreviewBar QToolButton {
+    background: #103753; color: #eaf4ff; border: 1px solid #24618b;
+    border-radius: 6px; padding: 8px 12px;
+}
+QWidget#eduToolCapturePage QPushButton:hover, QToolBar#eduToolCapturePreviewBar QToolButton:hover { background: #175386; }
+QWidget#eduToolCapturePage QPushButton:disabled { color: #71879b; background: #122b3d; border-color: #233d50; }
+QFrame#eduToolCaptureActions QPushButton { font-weight: 600; }
+QWidget#eduToolCapturePage QPushButton#eduToolRecordButton, QWidget#eduToolCapturePage QPushButton#eduToolStreamButton {
+    background: #f41439; border: 1px solid #ff4563; color: white;
+    font-size: 20px; font-weight: 700; padding: 12px 24px;
+}
+QWidget#eduToolCapturePage QPushButton#eduToolRecordButton:hover, QWidget#eduToolCapturePage QPushButton#eduToolStreamButton:hover { background: #ff3655; }
+QWidget#eduToolCapturePage QPushButton#eduToolRecordButton[secondary="true"] { background: #103753; border-color: #24618b; }
+QWidget#eduToolCapturePage QScrollArea { border: none; background: #071f35; }
+
+QWidget#eduToolCapturePage VolumeControl QPushButton { padding: 2px; min-width: 22px; min-height: 22px; }
+QWidget#eduToolCapturePage VolumeControl { background: transparent; }
+QToolBar#eduToolFeatureBar QToolButton { font-size: 16px; }

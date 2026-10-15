@@ -448,7 +448,22 @@ OBSBasic::OBSBasic(QWidget *parent) : OBSMainWindow(parent), undo_s(ui), ui(new 
 	/* Keep the OBS preview alive while the EduTool feature pages change. */
 	auto *featurePages = new QStackedWidget(this);
 	featurePages->setObjectName(QStringLiteral("eduToolFeaturePages"));
-	featurePages->addWidget(takeCentralWidget());
+	auto *previewContent = takeCentralWidget();
+	auto *capturePage = new QWidget(featurePages);
+	capturePage->setObjectName(QStringLiteral("eduToolCapturePage"));
+	auto *captureLayout = new QVBoxLayout(capturePage);
+	captureLayout->setContentsMargins(16, 12, 16, 12);
+	captureLayout->setSpacing(12);
+	auto *captureBody = new QHBoxLayout;
+	captureBody->setSpacing(14);
+	captureLayout->addLayout(captureBody, 1);
+	auto *previewFrame = new QFrame(capturePage);
+	previewFrame->setObjectName(QStringLiteral("eduToolPreviewFrame"));
+	auto *previewFrameLayout = new QVBoxLayout(previewFrame);
+	previewFrameLayout->setContentsMargins(10, 10, 10, 10);
+	previewFrameLayout->addWidget(previewContent, 1);
+	captureBody->addWidget(previewFrame, 3);
+	featurePages->addWidget(capturePage);
 	auto *editor = new EduToolEditor(featurePages);
 	auto *editorScroll = new QScrollArea(featurePages);
 	editorScroll->setWidgetResizable(true);
@@ -485,12 +500,18 @@ OBSBasic::OBSBasic(QWidget *parent) : OBSMainWindow(parent), undo_s(ui), ui(new 
 	editPageAction->setObjectName("eduToolEditPageAction");
 	auto *uploadPageAction = addFeatureAction(QStringLiteral("업로드"));
 	uploadPageAction->setObjectName("eduToolUploadPageAction");
+	recordPageAction->setIcon(QIcon(QStringLiteral(":/res/images/recording-active.svg")));
+	livePageAction->setIcon(QIcon(QStringLiteral(":/res/images/streaming-active.svg")));
+	editPageAction->setIcon(QIcon(QStringLiteral(":/res/images/sources/media.svg")));
+	uploadPageAction->setIcon(QIcon(QStringLiteral(":/res/images/sources/globe.svg")));
+	featureBar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+	featureBar->setIconSize(QSize(24, 24));
 	recordPageAction->setChecked(true);
 	featureBar->addSeparator();
 	auto *recordSettingsAction = featureBar->addAction(QStringLiteral("녹화 세부 설정"));
 	auto *liveSettingsAction = featureBar->addAction(QStringLiteral("방송 세부 설정"));
 	auto *previewBar = new QToolBar(QStringLiteral("미리보기 도구"), this);
-	previewBar->setObjectName(QStringLiteral("eduToolPreviewBar"));
+	previewBar->setObjectName(QStringLiteral("eduToolCapturePreviewBar"));
 	previewBar->setMovable(false);
 	previewBar->setFloatable(false);
 	auto *previewFullscreenAction = previewBar->addAction(QStringLiteral("미리보기 전체화면"));
@@ -502,25 +523,80 @@ OBSBasic::OBSBasic(QWidget *parent) : OBSMainWindow(parent), undo_s(ui), ui(new 
 		compositionAction->setEnabled(ui->actionEditTransform->isEnabled());
 	});
 	connect(compositionAction, &QAction::triggered, this, &OBSBasic::on_actionEditTransform_triggered);
-	auto *statusDock = new QDockWidget(QStringLiteral("장치 및 출력 상태"), this);
-	statusDock->setObjectName(QStringLiteral("eduToolStatusDock"));
-	statusDock->setMinimumWidth(220);
-	statusDock->setFeatures(QDockWidget::DockWidgetClosable);
-	statusDock->setAllowedAreas(Qt::RightDockWidgetArea);
-	auto *statusContent = new QWidget(statusDock);
+	auto *statusContent = new QWidget(capturePage);
+	statusContent->setObjectName(QStringLiteral("eduToolDevicePanel"));
+	statusContent->setMinimumWidth(300);
+	statusContent->setMaximumWidth(460);
+	auto *statusScroll = new QScrollArea(capturePage);
+	statusScroll->setWidgetResizable(true);
+	statusScroll->setFrameShape(QFrame::NoFrame);
+	statusScroll->setMinimumWidth(320);
+	statusScroll->setWidget(statusContent);
+	captureBody->addWidget(statusScroll, 1);
 	auto *statusLayout = new QVBoxLayout(statusContent);
-	statusLayout->setContentsMargins(16, 16, 16, 16);
+	statusLayout->setContentsMargins(0, 0, 0, 0);
+	statusLayout->setSpacing(12);
+	auto makeCard = [statusContent, statusLayout](const QString &title) {
+		auto *card = new QFrame(statusContent);
+		card->setObjectName(QStringLiteral("eduToolDeviceCard"));
+		auto *layout = new QVBoxLayout(card);
+		layout->setContentsMargins(16, 10, 16, 10);
+		layout->setSpacing(8);
+		auto *heading = new QLabel(title, card);
+		heading->setObjectName(QStringLiteral("eduToolCardHeading"));
+		layout->addWidget(heading);
+		statusLayout->addWidget(card);
+		return layout;
+	};
+	auto *cameraCard = makeCard(QStringLiteral("카메라"));
+	auto *cameraStateLabel = new QLabel(statusContent);
+	cameraStateLabel->setWordWrap(true);
+	cameraCard->addWidget(cameraStateLabel);
 	auto *panelVideoStatus = new QLabel(statusContent);
 	auto *panelSourceStatus = new QLabel(statusContent);
 	auto *panelActivityStatus = new QLabel(statusContent);
-	for (auto *label : {panelVideoStatus, panelSourceStatus, panelActivityStatus}) {
-		label->setWordWrap(true);
-		statusLayout->addWidget(label);
+	panelVideoStatus->hide();
+	panelSourceStatus->hide();
+	panelActivityStatus->hide();
+	auto *cameraSettings = new QPushButton(QStringLiteral("카메라 선택 · 세부 설정"), statusContent);
+	cameraCard->addWidget(cameraSettings);
+	connect(cameraSettings, &QPushButton::clicked, this, &OBSBasic::OpenEduToolCameraSettings);
+	auto *micCard = makeCard(QStringLiteral("마이크"));
+	auto *pcCard = makeCard(QStringLiteral("PC 소리"));
+	// Keep the existing OBS volume control and its real level/mute/monitor signals.
+	for (const auto &entry : {qMakePair(micCard, 3u), qMakePair(pcCard, 1u)}) {
+		auto *host = new QWidget(statusContent);
+		auto *row = new QVBoxLayout(host);
+		row->setContentsMargins(0, 0, 0, 0);
+		entry.first->addWidget(host);
+		auto currentId = std::make_shared<QString>();
+		auto *timer = new QTimer(host);
+		connect(timer, &QTimer::timeout, host, [host, row, currentId, first = entry.second]() {
+			OBSSource source;
+			for (uint32_t channel = first; channel <= (first == 1 ? 2u : 6u); ++channel) {
+				OBSSourceAutoRelease candidate = obs_get_output_source(channel);
+				if (candidate) { source = candidate; break; }
+			}
+			const QString id = source ? QString::fromUtf8(obs_source_get_uuid(source)) : QStringLiteral("none");
+			if (*currentId == id) return;
+			*currentId = id;
+			while (auto *item = row->takeAt(0)) { delete item->widget(); delete item; }
+			if (source) row->addWidget(new VolumeControl(source, host));
+			else row->addWidget(new QLabel(QStringLiteral("설정된 장치가 없습니다"), host));
+		});
+		timer->start(1000);
+		auto *settings = new QPushButton(QStringLiteral("장치 선택 · 오디오 설정"), statusContent);
+		entry.first->addWidget(settings);
+		connect(settings, &QPushButton::clicked, this, &OBSBasic::OpenEduToolAudioSettings);
 	}
+	auto *connectionCard = makeCard(QStringLiteral("방송 연결"));
 	auto *liveConnection = new QLabel(statusContent);
 	liveConnection->setWordWrap(true);
 	liveConnection->setTextFormat(Qt::PlainText);
-	statusLayout->addWidget(liveConnection);
+	connectionCard->addWidget(liveConnection);
+	auto *connectButton = new QPushButton(QStringLiteral("연결 설정"), statusContent);
+	connectionCard->addWidget(connectButton);
+	connect(connectButton, &QPushButton::clicked, this, [this]() { OpenSettingsPage(2); });
 	auto *connectionTimer = new QTimer(statusContent);
 	connect(connectionTimer, &QTimer::timeout, statusContent, [this, liveConnection]() {
 		obs_service_t *current = GetService();
@@ -533,21 +609,38 @@ OBSBasic::OBSBasic(QWidget *parent) : OBSMainWindow(parent), undo_s(ui), ui(new 
 		liveConnection->setText(QStringLiteral("%1\n%2").arg(provider, state));
 	});
 	connectionTimer->start(1000);
+	auto *uploadCard = makeCard(QStringLiteral("자동 업로드"));
+	auto *autoUpload = new QCheckBox(QStringLiteral("녹화 종료 후 자동 업로드"), statusContent);
+	uploadCard->addWidget(autoUpload);
+	if (auto *option = portal->findChild<QCheckBox *>(QStringLiteral("eduToolAutoUpload"))) {
+		autoUpload->setChecked(option->isChecked());
+		connect(autoUpload, &QCheckBox::toggled, option, &QCheckBox::setChecked);
+		connect(option, &QCheckBox::toggled, autoUpload, &QCheckBox::setChecked);
+	}
+	auto *uploadSettings = new QPushButton(QStringLiteral("업로드 대상 · 계정 확인"), statusContent);
+	uploadCard->addWidget(uploadSettings);
+	connect(uploadSettings, &QPushButton::clicked, uploadPageAction, &QAction::trigger);
 	statusLayout->addStretch();
-	auto *cameraSettings = new QPushButton(QStringLiteral("카메라 세부 설정"), statusContent);
-	statusLayout->addWidget(cameraSettings);
-	connect(cameraSettings, &QPushButton::clicked, this, &OBSBasic::OpenEduToolCameraSettings);
-	auto *audioSettings = new QPushButton(QStringLiteral("오디오 세부 설정"), statusContent);
-	statusLayout->addWidget(audioSettings);
-	connect(audioSettings, &QPushButton::clicked, this, &OBSBasic::OpenEduToolAudioSettings);
+	auto *actionBar = new QFrame(capturePage);
+	actionBar->setObjectName(QStringLiteral("eduToolCaptureActions"));
+	auto *actionLayout = new QVBoxLayout(actionBar);
+	actionLayout->setContentsMargins(16, 12, 16, 12);
+	actionLayout->setSpacing(12);
+	auto *storageRow = new QHBoxLayout;
+	auto *actionRow = new QHBoxLayout;
+	storageRow->setSpacing(12);
+	actionRow->setSpacing(12);
+	actionLayout->addLayout(storageRow);
+	actionLayout->addLayout(actionRow);
+	captureLayout->addWidget(actionBar);
 	auto *delayLabel = new QLabel(QStringLiteral("녹화 시작 지연"), statusContent);
-	statusLayout->addWidget(delayLabel);
+	actionRow->addWidget(delayLabel);
 	auto *recordDelay = new QSpinBox(statusContent);
 	recordDelay->setRange(0, 60);
 	recordDelay->setSuffix(QStringLiteral(" 초"));
 	recordDelay->setSpecialValueText(QStringLiteral("즉시 시작"));
 	recordDelay->setAccessibleName(QStringLiteral("녹화 시작 지연 시간"));
-	statusLayout->addWidget(recordDelay);
+	actionRow->addWidget(recordDelay);
 	connect(recordDelay, &QSpinBox::valueChanged, this, [this](int value) {
 		const int previous = int(config_get_int(Config(), "EduTool", "RecordDelaySeconds"));
 		config_set_int(Config(), "EduTool", "RecordDelaySeconds", value);
@@ -566,14 +659,14 @@ OBSBasic::OBSBasic(QWidget *parent) : OBSMainWindow(parent), undo_s(ui), ui(new 
 	auto *folderPath = new QLabel(statusContent);
 	folderPath->setTextFormat(Qt::PlainText);
 	folderPath->setWordWrap(true);
-	statusLayout->addWidget(folderPath);
+	storageRow->addWidget(folderPath, 1);
 	auto *folderSpace = new QLabel(statusContent);
 	folderSpace->setWordWrap(true);
-	statusLayout->addWidget(folderSpace);
+	storageRow->addWidget(folderSpace);
 	auto *openFolder = new QPushButton(QStringLiteral("저장 폴더 열기"), statusContent);
 	auto *changeFolder = new QPushButton(QStringLiteral("저장 위치 변경"), statusContent);
-	statusLayout->addWidget(openFolder);
-	statusLayout->addWidget(changeFolder);
+	storageRow->addWidget(openFolder);
+	storageRow->addWidget(changeFolder);
 	connect(openFolder, &QPushButton::clicked, this, &OBSBasic::on_actionShow_Recordings_triggered);
 	connect(changeFolder, &QPushButton::clicked, this, &OBSBasic::ChangeEduToolRecordingFolder);
 	auto updateFolder = [this, folderPath, folderSpace, openFolder, changeFolder]() {
@@ -593,10 +686,39 @@ OBSBasic::OBSBasic(QWidget *parent) : OBSMainWindow(parent), undo_s(ui), ui(new 
 	auto *folderTimer = new QTimer(statusContent);
 	connect(folderTimer, &QTimer::timeout, statusContent, updateFolder);
 	folderTimer->start(3000);
-	statusDock->setWidget(statusContent);
-	addDockWidget(Qt::RightDockWidgetArea, statusDock);
-	statusDock->toggleViewAction()->setText(QStringLiteral("상태 패널"));
-	previewBar->addAction(statusDock->toggleViewAction());
+	auto *sourcesButton = new QPushButton(QStringLiteral("소스 관리"), actionBar);
+	actionRow->insertWidget(0, sourcesButton);
+	connect(sourcesButton, &QPushButton::clicked, this, &OBSBasic::OpenEduToolSourceManager);
+	auto *captureSettings = new QPushButton(QStringLiteral("녹화 설정"), actionBar);
+	actionRow->insertWidget(1, captureSettings);
+	connect(captureSettings, &QPushButton::clicked, this, [this, livePageAction]() { OpenSettingsPage(livePageAction->isChecked() ? 2 : 3); });
+	actionRow->addStretch();
+	// Delegate to the original buttons, retaining delay, pause, reconnect and stop handling.
+	auto mirrorControl = [this, controls, actionBar, actionRow](const char *name, const char *styleName) {
+		auto *original = controls->findChild<QPushButton *>(QString::fromUtf8(name));
+		auto *button = new QPushButton(actionBar);
+		button->setObjectName(QString::fromUtf8(styleName));
+		button->setMinimumHeight(56);
+		actionRow->addWidget(button);
+		connect(button, &QPushButton::clicked, original, &QPushButton::click);
+		auto *sync = new QTimer(button);
+		connect(sync, &QTimer::timeout, button, [original, button]() {
+			button->setText(original->text());
+			button->setIcon(original->icon());
+			button->setEnabled(original->isEnabled());
+			button->setToolTip(original->toolTip());
+			button->setAccessibleName(original->accessibleName());
+			button->setMenu(original->menu());
+			if (original->objectName() == "pauseRecordButton") button->setVisible(!original->isHidden());
+		});
+		sync->start(100);
+		return button;
+	};
+	auto *mainRecordButton = mirrorControl("recordButton", "eduToolRecordButton");
+	mainRecordButton->setMinimumWidth(190);
+	mirrorControl("pauseRecordButton", "eduToolPauseButton");
+	auto *mainStreamButton = mirrorControl("streamButton", "eduToolStreamButton");
+	mainStreamButton->setMinimumWidth(190);
 	liveSettingsAction->setVisible(false);
 	connect(recordSettingsAction, &QAction::triggered, this, [this]() { OpenSettingsPage(3); });
 	connect(liveSettingsAction, &QAction::triggered, this, [this]() { OpenSettingsPage(2); });
@@ -639,18 +761,19 @@ OBSBasic::OBSBasic(QWidget *parent) : OBSMainWindow(parent), undo_s(ui), ui(new 
 	errorStatus->hide();
 	errorSettings->hide();
 	addToolBar(Qt::TopToolBarArea, featureBar);
-	addToolBarBreak(Qt::TopToolBarArea);
-	addToolBar(Qt::TopToolBarArea, previewBar);
-	auto updateSourceStatus = [sourceStatus, panelSourceStatus]() {
+	previewFrameLayout->insertWidget(0, previewBar);
+	auto updateSourceStatus = [sourceStatus, panelSourceStatus, cameraStateLabel]() {
 		struct CameraState {
 			int configured = 0;
 			int connected = 0;
+			QStringList names;
 		} camera;
 		obs_enum_sources(
 			[](void *data, obs_source_t *source) {
 				auto *state = static_cast<CameraState *>(data);
 				if (strcmp(obs_source_get_id(source), "dshow_input") == 0) {
 					++state->configured;
+					state->names << QString::fromUtf8(obs_source_get_name(source));
 					state->connected += EduToolDeviceState(source, "video_device_id") ==
 							    QStringLiteral("연결됨");
 				}
@@ -683,6 +806,8 @@ OBSBasic::OBSBasic(QWidget *parent) : OBSMainWindow(parent), undo_s(ui), ui(new 
 		sourceStatus->setToolTip(QStringLiteral("카메라는 장치 목록, Windows 오디오는 장치 목록과 캡처 초기화 상태를 확인합니다. 음성 입력과 청음은 레벨 미터 및 녹화 결과로 확인하세요."));
 		panelSourceStatus->setText(QStringLiteral("카메라: %1\n\n마이크: %2\n\nPC 소리: %3")
 						  .arg(cameraText, audioState(3, 6), audioState(1, 2)));
+		cameraStateLabel->setText(QStringLiteral("%1\n%2").arg(cameraText,
+			camera.names.isEmpty() ? QStringLiteral("카메라를 선택해 주세요") : camera.names.join(QStringLiteral(" / "))));
 	};
 	auto *sourceStatusTimer = new QTimer(this);
 	connect(sourceStatusTimer, &QTimer::timeout, this, updateSourceStatus);
@@ -697,7 +822,7 @@ OBSBasic::OBSBasic(QWidget *parent) : OBSMainWindow(parent), undo_s(ui), ui(new 
 
 	auto dockVisibility = std::make_shared<QList<QPair<QDockWidget *, bool>>>();
 	auto switchFeature = [this, featurePages, dockVisibility, recordSettingsAction, liveSettingsAction,
-			   previewBar](
+			   previewBar, connectionCard, uploadCard, mainStreamButton, mainRecordButton, captureSettings](
 			     int page, bool recording, bool live) {
 		const bool leavingPreview = featurePages->currentIndex() == 0 && page != 0;
 		const bool returningToPreview = featurePages->currentIndex() != 0 && page == 0;
@@ -714,7 +839,17 @@ OBSBasic::OBSBasic(QWidget *parent) : OBSMainWindow(parent), undo_s(ui), ui(new 
 				dock->setVisible(wasVisible);
 			}
 		}
-		if (page == 0) controlsDock->show();
+		if (page == 0) {
+			// The capture shell owns its layout; old per-PC dock geometry cannot displace it.
+			for (auto *dock : findChildren<QDockWidget *>(QString(), Qt::FindDirectChildrenOnly)) dock->hide();
+		}
+		connectionCard->parentWidget()->setVisible(live);
+		uploadCard->parentWidget()->setVisible(recording);
+		mainRecordButton->setProperty("secondary", live);
+		mainRecordButton->style()->unpolish(mainRecordButton);
+		mainRecordButton->style()->polish(mainRecordButton);
+		mainStreamButton->setVisible(live || StreamingActive());
+		captureSettings->setText(live ? QStringLiteral("방송 설정") : QStringLiteral("녹화 설정"));
 		recordSettingsAction->setVisible(recording);
 		liveSettingsAction->setVisible(live);
 		previewBar->setVisible(recording || live);
@@ -1654,8 +1789,9 @@ void OBSBasic::OBSInit()
 		}
 	}
 
-	// Restore the feature only after OBS has restored the saved dock layout.
+	// Do not restore the old preview toolbar into the new fixed capture shell.
 	QTimer::singleShot(0, this, [this]() {
+		restoreState(startingDockLayout);
 		const QString mode = QString::fromUtf8(config_get_string(App()->GetUserConfig(), "EduTool", "LastFeature"));
 		const QString actionName = mode == "edit" ? "eduToolEditPageAction" : mode == "upload" ? "eduToolUploadPageAction" : mode == "live" ? "eduToolLivePageAction" : "eduToolRecordPageAction";
 		if (auto *action = findChild<QAction *>(actionName)) action->trigger();
@@ -1799,7 +1935,7 @@ void OBSBasic::OBSInit()
 
 void OBSBasic::OnFirstLoad()
 {
-	if (auto *previewBar = findChild<QToolBar *>(QStringLiteral("eduToolPreviewBar"))) {
+	if (auto *previewBar = findChild<QToolBar *>(QStringLiteral("eduToolCapturePreviewBar"))) {
 		insertToolBarBreak(previewBar);
 	}
 	OnEvent(OBS_FRONTEND_EVENT_FINISHED_LOADING);
